@@ -1,0 +1,70 @@
+<!--
+  Config page
+-->
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
+         xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" 
+         xmlns:p="/lib/hudson/project" xmlns:x="jelly:xml">
+
+  <st:include page="configure-common.jelly" />
+  
+  
+  <!--build triggers-->
+  <p:config-trigger>
+    <p:config-upstream-pseudo-trigger />
+  </p:config-trigger>
+
+  <!--<p:config-buildWrappers />-->
+  
+  <!--build steps-->
+  <p:config-builders />
+  
+  <!--post build actions-->
+  
+  <p:config-publishers2 />
+
+
+   <!--  <st:include page="progress.groovy" />-->
+
+<!-- <st:adjunct includes="lib.layout.progressiveRendering.progressiveRendering"/>
+  XXX generate an ID so we can use this more than once per page 
+ <t:progressBar id="status" pos="50" tooltip="${tooltip ?: '%progressMessage'}"/>
+ <j:invoke method="start" on="${handler}"/>
+ <script>progressivelyRender(<st:bind value="${handler}"/>, ${callback});</script>-->
+
+<!--  <div style="padding-left: 32px">-->
+ <!--<t:progressBar pos="${it.percentage}" />-->
+  <!--</div>-->
+  <x:element name="td">
+  <x:element name="table">
+  <x:attribute name="class">progress-bar</x:attribute>
+    <j:if test="${attrs.id!=null}">
+      <x:attribute name="id">${id}</x:attribute>
+    </j:if>
+    <j:if test="${attrs.tooltip!=null}">
+      <x:attribute name="tooltip">${tooltip}</x:attribute>
+    </j:if>
+    <j:if test="${href!=null}">
+	  	<x:attribute name="style">cursor:pointer</x:attribute>
+	    <x:attribute name="onclick">window.location='${href}'</x:attribute>
+      <!-- note that this won't take effect in browsers that don't let JavaScript change status bar, like Firefox. -->
+	    <x:attribute name="onmouseover">window.status='${href}';return true;</x:attribute>
+	    <x:attribute name="onmouseout">window.status=null;return true;</x:attribute>
+	  </j:if>
+	  <j:choose>
+	    <j:when test="${pos lt 0}">
+	      <tbody><tr style="background-image:url(${imagesURL}/progress-unknown.gif)"><td></td></tr></tbody>
+	    </j:when>
+	    <j:otherwise>
+	        <tbody><tr>
+	          <td class="progress-bar-done" style="width:${pos}%;"></td>
+	          <td class="progress-bar-left" style="width:${100-pos}%"></td>
+	        </tr>
+	      </tbody>
+	    </j:otherwise>
+	  </j:choose>
+	</x:element>
+      </x:element>
+  <p:config-publishers />
+
+</j:jelly>
