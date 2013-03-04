@@ -94,7 +94,7 @@ public class GridJob extends AbstractProject<GridJob,GridRun> implements TopLeve
     @Extension
     public static final class DescriptorImpl extends AbstractProjectDescriptor {
         public String getDisplayName() {
-            return "Diploma type job development!";
+            return "Diploma thesis entry in development!";
         }
         @Override
         public String getConfigPage() {

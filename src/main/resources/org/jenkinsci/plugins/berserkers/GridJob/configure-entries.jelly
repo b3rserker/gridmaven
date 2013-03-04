@@ -5,26 +5,34 @@
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
          xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" 
          xmlns:p="/lib/hudson/project" xmlns:x="jelly:xml">
-
-  <st:include page="configure-common.jelly" />
   
-  
-  <!--build triggers-->
+   <!--build triggers-->
   <p:config-trigger>
     <p:config-upstream-pseudo-trigger />
-  </p:config-trigger>
+  </p:config-trigger>   
+    
+  <!--scms-->
+  <st:include page="configure-common.jelly" />
 
   <!--<p:config-buildWrappers />-->
   
   <!--build steps-->
-  <p:config-builders />
+  <!--<p:config-builders />-->
   
   <!--post build actions-->
   
-  <p:config-publishers2 />
+<f:section title="Load multi-module Maven project">
+<f:entry title="Select path">
+    <f:textbox autoCompleteDelimChar=" "/>
+    <f:button name="test" description="test2"/>
+</f:entry>
+</f:section>
 
 
-   <!--  <st:include page="progress.groovy" />-->
+<f:block>
+  <f:hetero-list name="builder" hasHeader="true"
+                 addCaption="Load"/>
+</f:block>
 
 <!-- <st:adjunct includes="lib.layout.progressiveRendering.progressiveRendering"/>
   XXX generate an ID so we can use this more than once per page 
@@ -65,6 +73,16 @@
 	  </j:choose>
 	</x:element>
       </x:element>
-  <p:config-publishers />
+  
+<f:section title="Modules contained in this project">
+<f:entry title="Here is list of loaded modules"></f:entry>
+<f:entry title="Module1" description="properties1"></f:entry>
+<f:entry title="Module2" description="properties2"></f:entry>
+<f:entry title=" " description=" "></f:entry>
+<f:entry title="ModuleN" description="propertiesN"></f:entry>
+</f:section>
 
+  
+   <!--<p:config-publishers />-->
+   <p:config-publishers />
 </j:jelly>
