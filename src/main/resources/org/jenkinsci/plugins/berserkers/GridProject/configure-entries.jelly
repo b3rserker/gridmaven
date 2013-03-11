@@ -10,17 +10,16 @@
 <!--  <p:config-trigger>
     <p:config-upstream-pseudo-trigger />
   </p:config-trigger>-->
-  
-        
- <f:section title="${%Build}">
-    <f:entry title="${%Root POM}" help="/plugin/maven-plugin/root-pom.html">
-      <f:textbox name="rootPOM" value="${it.rootPOM}" checkUrl="'checkFileInWorkspace?value='+escape(this.value)" />
-    </f:entry>
-    <f:entry title="${%Goals and options}" help="/plugin/maven-plugin/goals.html">
-      <f:textbox name="goals" value="${it.goals}"/>
-    </f:entry>
-    
-  </f:section>
+
+<j:forEach var="d" items="${it.buildersForGrid}">
+        <f:block name="${d.jsonSafeClassName}" help="${d.helpFile}"
+          title="${d.displayName}">
+
+          <j:set var="descriptor" value="${d}" />
+          <j:set var="instance" value="${instances.get(d)}" />
+          <st:include from="${d}" page="${d.configPage}" optional="true" />
+        </f:block>
+</j:forEach>     
      
   <!--scms-->
   <!--<st:include page="configure-common.jelly" />-->
@@ -28,7 +27,7 @@
   <!--<p:config-buildWrappers />-->
   
 <!--  build steps-->
-  <p:config-builders />
+  <!--<p:config-builders />-->
   
   <!--post build actions-->
   

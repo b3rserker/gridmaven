@@ -11,6 +11,7 @@ import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
 import hudson.model.Descriptor;
 import hudson.model.FreeStyleProject;
+import hudson.model.Result;
 import hudson.model.Saveable;
 import hudson.tasks.BatchFile;
 import hudson.tasks.BuildStepDescriptor;
@@ -30,22 +31,11 @@ import org.kohsuke.stapler.StaplerRequest;
  */
 public class GridBuilder extends Builder {
 
-    private final String task;
-
-    @DataBoundConstructor
-    public GridBuilder(String task) {
-        this.task = task;
-    }
-    
-
-    public String getTask() {
-        return task;
-    }
-
     @Override
     public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, 
-    BuildListener listener) throws InterruptedException, IOException {
-    
+        BuildListener listener) throws InterruptedException, IOException {
+        listener.getLogger().println("Fake a failure");
+        //build.setResult(Result.FAILURE);
         return true;
     }  
 

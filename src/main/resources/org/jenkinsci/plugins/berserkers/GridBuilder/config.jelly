@@ -1,5 +1,11 @@
 <j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
-  <f:entry title="THIS IS SPARTA!" field="task">
-        <f:textbox/>
-  </f:entry>
+ <f:section title="${%Build}">
+    <f:entry title="${%Root POM}" help="/plugin/maven-plugin/root-pom.html">
+      <f:textbox name="rootPOM" value="${it.rootPOM}" 
+                 checkUrl="'checkFileInWorkspace?value='+escape(this.value)" />
+    </f:entry>
+    <f:entry title="${%Goals and options}" help="/plugin/maven-plugin/goals.html">
+      <f:textbox name="goals" value="${it.goals}"/>
+    </f:entry>
+  </f:section>
 </j:jelly>

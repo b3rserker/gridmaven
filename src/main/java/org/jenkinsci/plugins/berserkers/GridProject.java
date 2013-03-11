@@ -4,12 +4,15 @@ package org.jenkinsci.plugins.berserkers;
 import hudson.Extension;
 import hudson.Launcher;
 import hudson.Util;
+import hudson.diagnosis.OldDataMonitor;
 import hudson.model.*;
 import hudson.tasks.*;
 import hudson.util.DescribableList;
 import hudson.util.FormValidation;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.servlet.ServletException;
 import org.kohsuke.stapler.*;
@@ -31,30 +34,34 @@ import org.kohsuke.stapler.*;
  *
  * @author Kohsuke Kawaguchi
  */
-public class GridProject extends Project<GridProject,GridBuild> implements TopLevelItem{
+public class GridProject extends Project<GridProject,GridBuildRunner> implements TopLevelItem,Saveable{
 
-    private static final Logger LOGGER = Logger.getLogger(AbstractBuild.class.getName());
+    //private static final Logger LOGGER = Logger.getLogger(AbstractBuild.class.getName());
     
     private String goals;
     
     private String rootPOM;
 
-    private DescribableList<Builder,Descriptor<Builder>> builders;
+    private DescribableList<Builder,Descriptor<Builder>> buildersvar;
     
       
         
-    public GridProject(ItemGroup itemGroup, String name) throws IOException {
+    public GridProject(ItemGroup itemGroup, String name) {
         super(itemGroup, name);
-        this.builders = new DescribableList<Builder,Descriptor<Builder>>((Saveable) this);
-        builders.add(new GridBuilder(""));
+        this.buildersvar = new DescribableList<Builder,Descriptor<Builder>>(this);
+        try {
+            buildersvar.add(new GridBuilder());
+        } catch (IOException ex) {
+            Logger.getLogger(GridProject.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
     
     public List<Builder> getBuilders() {
-        return builders.toList();
+        return buildersvar.toList();
     }
 
     public DescribableList<Builder,Descriptor<Builder>> getBuildersList() {
-        return builders;
+        return buildersvar;
     }
     
     public String getGoals() {
@@ -78,8 +85,8 @@ public class GridProject extends Project<GridProject,GridBuild> implements TopLe
     }
    
     @Override
-    protected Class<GridBuild> getBuildClass() {
-        return GridBuild.class;
+    protected Class<GridBuildRunner> getBuildClass() {
+        return GridBuildRunner.class;
     }
 
     public FormValidation doCheckFileInWorkspace(@QueryParameter String value) throws IOException, ServletException {
@@ -87,24 +94,18 @@ public class GridProject extends Project<GridProject,GridBuild> implements TopLe
     }
     
     
-    @Override
-    public List<Builder> getBuilders() {
-        List<Descriptor<Builder>> list = BuildStepDescriptor.filter(Builder.all(), getClass());
-        System.out.println("Start vypisu builderu, velikosT12: "+list.size());
-        for (Descriptor br : list){
-            System.out.println(br.getClass());
-        }
-        
-        //return list.toList();
-        return null;
+    public List<Descriptor<Builder>> getBuildersForGrid() {
+        List<Descriptor<Builder>> list = new ArrayList<Descriptor<Builder>>();
+        list.add(buildersvar.get(0).getDescriptor());
+        return list;
     }    
    
-    
-    @Override
-    public void onLoad(ItemGroup<? extends Item> parent, String name) throws IOException {
-        super.onLoad(parent, name);
-        System.out.println("LOADED FROM DISK Builderu tady:"+super.getBuildersList().size());
-    }
+
+//    @Override
+//    public void onLoad(ItemGroup<? extends Item> parent, String name) throws IOException {
+//        super.onLoad(parent, name);
+//        System.out.println("LOADED FROM DISK Builderu tady:"+super.getBuildersList().size());
+//    }
     
 //    @Override
 //    public Label getAssignedLabel() {
