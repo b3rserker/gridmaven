@@ -6,15 +6,19 @@ import hudson.Launcher;
 import hudson.Util;
 import hudson.diagnosis.OldDataMonitor;
 import hudson.model.*;
+import hudson.model.labels.LabelAtom;
 import hudson.tasks.*;
 import hudson.util.DescribableList;
 import hudson.util.FormValidation;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.servlet.ServletException;
+import net.sf.json.JSONObject;
 import org.kohsuke.stapler.*;
 
 /**
@@ -34,50 +38,57 @@ import org.kohsuke.stapler.*;
  *
  * @author Kohsuke Kawaguchi
  */
-public class GridProject extends Project<GridProject,GridBuildRunner> implements TopLevelItem,Saveable{
+public class GridProject extends Project<GridProject,GridBuildRunner> implements
+        TopLevelItem,Saveable {
 
     //private static final Logger LOGGER = Logger.getLogger(AbstractBuild.class.getName());
-    
-    private String goals;
-    
-    private String rootPOM;
 
     private DescribableList<Builder,Descriptor<Builder>> buildersvar;
-    
       
-        
     public GridProject(ItemGroup itemGroup, String name) {
         super(itemGroup, name);
         this.buildersvar = new DescribableList<Builder,Descriptor<Builder>>(this);
         try {
-            buildersvar.add(new GridBuilder());
+            //buildersvar.add(new GridBuilder("whatever","test","hi"));
+            //GridBuilder i = GridBuilder.DescriptorImpl.newInstance(null, null);
+            buildersvar.add(new GridBuilder("",""));
         } catch (IOException ex) {
             Logger.getLogger(GridProject.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
     
+    @Override
     public List<Builder> getBuilders() {
         return buildersvar.toList();
     }
 
+    public GridBuilder getOneBuilder() {
+        return (GridBuilder) getBuilders().get(0);
+    }
+    
+    public String getRootPOM(){
+        return getOneBuilder().getRootPOM();
+    }
+    
+    public String getGoals(){
+        return getOneBuilder().getGoals();
+    }     
+    @Override
     public DescribableList<Builder,Descriptor<Builder>> getBuildersList() {
         return buildersvar;
     }
     
-    public String getGoals() {
-        return goals;
-    }
-    
-    public String getRootPOM() {
-        return rootPOM;
-    }
-    
     @Override
-    protected void submit( StaplerRequest req, StaplerResponse rsp ) throws IOException, ServletException, Descriptor.FormException {
+    protected void submit( StaplerRequest req, StaplerResponse rsp ) 
+            throws IOException, ServletException, Descriptor.FormException {
         super.submit(req,rsp);
-        rootPOM = Util.fixEmpty(req.getParameter("rootPOM").trim());
-        if(rootPOM!=null && rootPOM.equals("pom.xml"))   rootPOM=null;   // normalization
-        goals = Util.fixEmpty(req.getParameter("goals").trim());
+        GridBuilder b = (GridBuilder) getOneBuilder();
+        //JSONObject json = req.getSubmittedForm();
+        b.setRootPOM(Util.fixEmpty(req.getParameter("rootPOM").trim()));
+        //if(rootPOM!=null && rootPOM.equals("pom.xml"))   rootPOM=null;   // normalization
+        b.setGoals(Util.fixEmpty(req.getParameter("goals").trim()));
+        
+        //buildersvar.rebuildHetero(req,json, Builder.all(), "builder");
     }
     
     public TopLevelItemDescriptor getDescriptor() {
@@ -89,7 +100,8 @@ public class GridProject extends Project<GridProject,GridBuildRunner> implements
         return GridBuildRunner.class;
     }
 
-    public FormValidation doCheckFileInWorkspace(@QueryParameter String value) throws IOException, ServletException {
+    public FormValidation doCheckFileInWorkspace(@QueryParameter String value) 
+            throws IOException, ServletException {
         return FormValidation.ok();
     }
     
@@ -107,10 +119,10 @@ public class GridProject extends Project<GridProject,GridBuildRunner> implements
 //        System.out.println("LOADED FROM DISK Builderu tady:"+super.getBuildersList().size());
 //    }
     
-//    @Override
-//    public Label getAssignedLabel() {
-//        return new LabelAtom("suse1");
-//    }    
+    @Override
+    public Label getAssignedLabel() {
+        return new LabelAtom("master");
+    }    
     
     @Extension
     public static final class DescriptorImpl extends AbstractProjectDescriptor {

@@ -4,23 +4,63 @@
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define"
          xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" 
-         xmlns:p="/lib/hudson/project" xmlns:x="jelly:xml">
+         xmlns:p="/lib/hudson/project" xmlns:x="jelly:xml" xmlns:local="local">
   
    <!--build triggers-->
 <!--  <p:config-trigger>
     <p:config-upstream-pseudo-trigger />
   </p:config-trigger>-->
-
+  <!-- master/slave -->
+  <j:if test="${app.labels.size() gt 1 || app.clouds.size() gt 0 || (it.assignedLabel!=null and it.assignedLabel!=app.selfLabel)}">
+    <f:optionalBlock name="hasSlaveAffinity" title="${%Restrict where this project can be run}" checked="${it.assignedLabel!=null}"
+        help="/help/project-config/slave.html">
+      <f:entry title="${%Label Expression}" field="assignedLabelString">
+        <f:textbox autoCompleteDelimChar=" "/>
+      </f:entry>
+    </f:optionalBlock>
+  </j:if>
+  
+  
+<!--  <f:section title="${%Advanced Project Options}">
+    <f:advanced>
+      <p:config-quietPeriod />
+      <p:config-retryCount />
+      <p:config-blockWhenUpstreamBuilding />
+      <p:config-blockWhenDownstreamBuilding />
+      <st:include page="configure-advanced.jelly" optional="true" />
+      <f:entry title="${%Display Name}" field="displayNameOrNull">
+         <f:textbox checkUrl="'${rootURL}/checkDisplayName?displayName='+encodeURIComponent(this.value)+'&amp;jobName='+encodeURIComponent('${h.jsStringEscape(it.name)}')"/>
+      </f:entry>
+      
+    </f:advanced>
+  </f:section>
+  -->
+  
 <j:forEach var="d" items="${it.buildersForGrid}">
-        <f:block name="${d.jsonSafeClassName}" help="${d.helpFile}"
-          title="${d.displayName}">
+        <f:block name="${d.jsonSafeClassName}" help="${d.helpFile}" title="${d.displayName}">
 
           <j:set var="descriptor" value="${d}" />
           <j:set var="instance" value="${instances.get(d)}" />
+
           <st:include from="${d}" page="${d.configPage}" optional="true" />
+          
         </f:block>
 </j:forEach>     
-     
+
+  
+<!-- <f:block>
+      <f:hetero-list name="builder" hasHeader="true"
+                     descriptors="${h.getBuilderDescriptors(it)}"
+                     items="${it.builders}"
+                     addCaption="${%Add build step}"/>
+    </f:block>-->
+    
+<!--<j:set var="name" value="test" />
+<j:set var="hasHeader" value="true" />
+<j:set var="items" value="${it.buildersForGrid}" />
+<j:set var="descriptors" value="${h.getBuilderDescriptors(it)}" />
+<j:set var="addCaption" value="HUH" />-->
+                                                                                        
   <!--scms-->
   <!--<st:include page="configure-common.jelly" />-->
 

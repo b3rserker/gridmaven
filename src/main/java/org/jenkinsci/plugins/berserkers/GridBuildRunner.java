@@ -1,6 +1,7 @@
 package org.jenkinsci.plugins.berserkers;
 
 
+import org.jenkinsci.plugins.submodules.GridSubProject;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Build;
@@ -47,9 +48,7 @@ public class GridBuildRunner extends Build<GridProject,GridBuildRunner>{
 
     public GridBuildRunner(GridProject project, File buildDir) throws IOException {
         super(project, buildDir);
-    }
-    
-    
+    } 
 
     @Override
     public void run() {
@@ -59,11 +58,6 @@ public class GridBuildRunner extends Build<GridProject,GridBuildRunner>{
     
     
 protected class Execution extends AbstractBuildExecution {
- /*
-            Some plugins might depend on this instance castable to Runner, so we need to use
-            deprecated class here.
-         */
-
         protected Result doRun(BuildListener listener) throws Exception {
             if(!preBuild(listener,project.getBuilders()))
                 return FAILURE;
@@ -85,7 +79,9 @@ protected class Execution extends AbstractBuildExecution {
                         return (r = FAILURE);
                     buildEnvironments.add(e);
                 }
-
+                GridSubProject b;
+                b = new GridSubProject(this.getProject().getParent(), "");
+                b.scheduleBuild(new Cause.UpstreamCause((Run<?,?>)GridBuildRunner.this));
                 if(!build(listener,project.getBuilders()))
                     r = FAILURE;
             } catch (InterruptedException e) {
