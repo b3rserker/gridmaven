@@ -1,6 +1,7 @@
 package hudson.gridmaven.scheduler;
 
 import hudson.Extension;
+import hudson.gridmaven.MavenModuleSet;
 import hudson.model.Node;
 import hudson.model.Queue.BuildableItem;
 import hudson.model.queue.QueueTaskDispatcher;
@@ -17,7 +18,9 @@ public class SmartJenkinsQueueTaskDispatcher extends QueueTaskDispatcher {
 //			return new BecauseOfSmartJenkinsSchedule();
 //		}
 //		return null;
-            return null;
+            if (item.task.getClass() == MavenModuleSet.class)
+                return null;
+            return new BecauseOfSmartJenkinsSchedule();
 	}
 
 	private static class BecauseOfSmartJenkinsSchedule extends CauseOfBlockage {
@@ -26,5 +29,6 @@ public class SmartJenkinsQueueTaskDispatcher extends QueueTaskDispatcher {
 		public String getShortDescription() {
 			return "Blocked by Smart-Jenkins";
 		}
+                
 	}
 }
