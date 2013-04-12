@@ -24,24 +24,28 @@
  */
 package hudson.gridmaven;
 
+import org.apache.hadoop.conf.*;
+import org.apache.hadoop.*;
+import org.apache.hadoop.fs.*;
+import org.apache.hadoop.hdfs.*;
+import org.apache.hadoop.hdfs.tools.*;
 import static hudson.model.Result.FAILURE;
 import hudson.AbortException;
 import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.FilePath.FileCallable;
 import hudson.Util;
-import hudson.console.ModelHyperlinkNote;
-import hudson.gridmaven.MavenBuild.ProxyImpl2;
 import hudson.maven.MavenEmbedder;
 import hudson.maven.MavenEmbedderException;
 import hudson.maven.MavenInformation;
 import hudson.gridmaven.Messages;
+import hudson.gridmaven.gridlayer.HadoopInstance;
+import hudson.gridmaven.gridlayer.PluginImpl;
 import hudson.maven.ReactorReader;
 import hudson.gridmaven.reporters.MavenAggregatedArtifactRecord;
 import hudson.gridmaven.reporters.MavenFingerprinter;
 import hudson.gridmaven.reporters.MavenMailer;
-import hudson.gridmaven.settings.SettingConfig;
-import hudson.gridmaven.settings.SettingsProviderUtils;
+import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.Build;
@@ -49,12 +53,10 @@ import hudson.model.BuildListener;
 import hudson.model.Cause.UpstreamCause;
 import hudson.model.Computer;
 import hudson.model.DependencyGraph;
-import hudson.model.Environment;
 import hudson.model.Executor;
 import hudson.model.Fingerprint;
 import hudson.model.Node;
 import hudson.model.ParameterDefinition;
-import hudson.model.ParametersAction;
 import hudson.model.ParametersDefinitionProperty;
 import hudson.model.Result;
 import hudson.model.Run;
@@ -63,10 +65,8 @@ import hudson.model.TaskListener;
 import hudson.remoting.VirtualChannel;
 import hudson.scm.ChangeLogSet;
 import hudson.tasks.BuildStep;
-import hudson.tasks.BuildWrapper;
 import hudson.tasks.MailSender;
 import hudson.tasks.Maven.MavenInstallation;
-import hudson.util.ArgumentListBuilder;
 import hudson.util.IOUtils;
 import hudson.util.StreamTaskListener;
 
@@ -74,6 +74,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.PrintStream;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -95,7 +97,6 @@ import jenkins.model.Jenkins;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang.StringUtils;
-import org.apache.maven.artifact.versioning.ComparableVersion;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuildingException;
@@ -570,8 +571,8 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
 
         	Result r = null;
         	PrintStream logger = listener.getLogger();
-            FilePath remoteSettings = null, remoteGlobalSettings = null;
-
+                FilePath remoteSettings = null, remoteGlobalSettings = null;
+            
             try {
             	
                 EnvVars envVars = getEnvironment(listener);
@@ -597,18 +598,20 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                 LOGGER.log(Level.FINE, "{0} is building with mavenVersion {1} from file {2}", 
                         new Object[]{getFullDisplayName(), mavenVersion, 
                             mavenInformation.getVersionResourcePath()});
-                    
-                //logger.println("Triggering "+project.getRootModule().getModuleName());
-                parsePoms(listener, logger, envVars, mvn, mavenVersion);
 
-                //project.getRootModule().scheduleBuild(new UpstreamCause((Run<?,?>)MavenModuleSetBuild.this));
-                Node nodes = Jenkins.getInstance().getNode("suse1");
+                // Start devel
+                parsePoms(listener, logger, envVars, mvn, mavenVersion);
                 
-                
-                MavenModule root = project.getRootModule();
-                
-                root.setAssignedNode(nodes);
-                
+                PluginImpl pl = PluginImpl.get();
+                MavenModule root = project.getRootModule(); 
+
+                // Hadoop adds all project files recursively to storage when job starts
+                HadoopInstance hadoop = new HadoopInstance();
+                String projectRoot = getWorkspace().getRemote() + File.separator + root.getRelativePath();
+                hadoop.quickAdd(projectRoot);
+                hadoop.listFiles("/");
+
+                //root.setAssignedNode(nodes);
                 root.scheduleBuild(new UpstreamCause((Run<?,?>)MavenModuleSetBuild.this));
                 
                 // Schedule build of dependencies
@@ -623,31 +626,42 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                         return graph.compare(rhs.getDownstreamProject(), lhs.getDownstreamProject());
                     }
                 });
+                
+                
 
-                for (DependencyGraph.Dependency dep : downstreamProjects) {
-                    AbstractProject p = dep.getDownstreamProject();
-                    if (p.isDisabled()) {
-                        logger.println(hudson.tasks.Messages.
-                                BuildTrigger_Disabled(ModelHyperlinkNote.encodeTo(p)));
-                        continue;
-                    }
-                    List<Action> buildActions = new ArrayList<Action>();
-                    if (dep.shouldTriggerBuild(root.getLastBuild(), listener, buildActions)) {
+//                List<MavenModule> mod = project.sortedActiveModules;
+//                for (MavenModule m : project.sortedActiveModules) {
+//                    MavenBuild mb = m.newBuild();
+//                    // JENKINS-8418
+//                    mb.setBuiltOnStr( getBuiltOnStr() );
+//                    // Check if incrementalBuild is selected and that there are changes -
+//                    mb.setWorkspace(getModuleRoot().child(m.getRelativePath()));
+//                    //proxies.put(m.getModuleName(), mb.new ProxyImpl2(MavenModuleSetBuild.this,slistener));
+//                }                
+                
+//                for (DependencyGraph.Dependency dep : downstreamProjects) {
+//                    AbstractProject p = dep.getDownstreamProject();
+//                    if (p.isDisabled()) {
+//                        logger.println(hudson.tasks.Messages.
+//                                BuildTrigger_Disabled(ModelHyperlinkNote.encodeTo(p)));
+//                        continue;
+//                    }
+//                    List<Action> buildActions = new ArrayList<Action>();
+                    //if (dep.shouldTriggerBuild(root.getLastBuild(), listener, buildActions)) {
                         // this is not completely accurate, as a new build might be triggered
                         // between these calls
-                        String name = ModelHyperlinkNote.encodeTo(p)+" #"+p.getNextBuildNumber();
-                        if(p.scheduleBuild(p.getQuietPeriod(), new UpstreamCause((Run)this.getBuild()),
-                                           buildActions.toArray(new Action[buildActions.size()]))) {
-                            logger.println(hudson.tasks.Messages.BuildTrigger_Triggering(name));
-                        } else {
-                            logger.println(hudson.tasks.Messages.BuildTrigger_InQueue(name));
-                        }
-                    }
-
-                }
+                        
+//                        String name = ModelHyperlinkNote.encodeTo(p)+" #"+p.getNextBuildNumber();
+//                        if(p.scheduleBuild(p.getQuietPeriod(), new UpstreamCause((Run)this.getBuild()),
+//                                           buildActions.toArray(new Action[buildActions.size()]))) {
+//                            logger.println(hudson.tasks.Messages.BuildTrigger_Triggering(name));
+//                        } else {
+//                            logger.println(hudson.tasks.Messages.BuildTrigger_InQueue(name));
+//                        }
+                    //}
                 
                 return r;
-            } catch (AbortException e) {
+            }catch (AbortException e) {
                 if(e.getMessage()!=null)
                     listener.error(e.getMessage());
                 return Result.FAILURE;
@@ -656,6 +670,7 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                 return Executor.currentExecutor().abortResult();
             } catch (IOException e) {
                 e.printStackTrace(listener.error(Messages.MavenModuleSetBuild_FailedToParsePom()));
+                e.printStackTrace();
                 return Result.FAILURE;
             } catch (RunnerAbortedException e) {
                 return Result.FAILURE;

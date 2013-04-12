@@ -1,7 +1,7 @@
 package hudson.gridmaven.reporters;
 
-import hudson.gridmaven.reporters.SurefireArchiver;
 import hudson.gridmaven.reporters.SurefireReport;
+import hudson.gridmaven.reporters.SurefireArchiver;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;

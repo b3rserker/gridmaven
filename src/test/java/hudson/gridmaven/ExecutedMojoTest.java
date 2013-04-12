@@ -1,7 +1,7 @@
 package hudson.gridmaven;
 
-import hudson.gridmaven.MojoInfo;
 import hudson.gridmaven.ExecutedMojo;
+import hudson.gridmaven.MojoInfo;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;

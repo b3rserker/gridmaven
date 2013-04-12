@@ -51,6 +51,7 @@ import org.codehaus.plexus.component.repository.exception.ComponentLookupExcepti
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
 
+
 /**
  * {@link Action} that remembers {@link MavenArtifact artifact}s that are built.
  *

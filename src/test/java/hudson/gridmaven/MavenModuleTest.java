@@ -1,8 +1,8 @@
 package hudson.gridmaven;
 
-import hudson.gridmaven.MavenModuleSet;
-import hudson.gridmaven.PomInfo;
 import hudson.gridmaven.MavenModule;
+import hudson.gridmaven.PomInfo;
+import hudson.gridmaven.MavenModuleSet;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;

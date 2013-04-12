@@ -1,3 +1,3 @@
-package hudson.gridmaven.local_repo.LocalRepositoryLocator;
+package hudson.maven.local_repo.LocalRepositoryLocator;
 
 // default no-op config fragment

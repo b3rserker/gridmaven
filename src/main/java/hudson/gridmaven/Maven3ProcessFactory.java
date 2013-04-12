@@ -79,6 +79,11 @@ public class Maven3ProcessFactory extends AbstractMavenProcessFactory implements
         return null;
     }
 
+    @Override
+    protected String getHadoopJar(MavenInstallation mvn, boolean isMaster, FilePath slaveRoot) throws IOException, InterruptedException {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
     /**
      * Finds classworlds.jar
      */

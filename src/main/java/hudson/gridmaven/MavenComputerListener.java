@@ -60,6 +60,7 @@ public class MavenComputerListener extends ComputerListener {
         copyJar(logger, root, AbortException.class, "maven-interceptor");
         copyJar(logger, root, Maven21Interceptor.class, "maven2.1-interceptor");
         copyJar(logger, root, ClassWorld.class, "plexus-classworld");
+        copyJar(logger, root, org.apache.hadoop.fs.LocalFileSystem.class, "hadoop-core");
         
         // copy classworlds 1.1 for maven2 builds
         // if this line fails during the unit test from IDE, it means you need to "mvn compile" maven-plugin

@@ -4,11 +4,11 @@ Group-Id: org.jenkins-ci.main
 Short-Name: maven-grid-plugin
 Long-Name: Maven Grid plugin
 Url: http://wiki.jenkins-ci.org/display/JENKINS/Maven+2+Project+Plugin
-Plugin-Version: 1.480.4-SNAPSHOT (private-03/28/2013 17:41-berserker)
+Plugin-Version: 1.480.4-SNAPSHOT (private-03/30/2013 12:16-berserker)
 Hudson-Version: 1.480.4-SNAPSHOT
 Jenkins-Version: 1.480.4-SNAPSHOT
-Plugin-Dependencies: javadoc:1.0,config-file-provider:1.9.1;resolution
- :=optional,token-macro:1.1;resolution:=optional
+Plugin-Dependencies: config-file-provider:1.9.1;resolution:=optional,t
+ oken-macro:1.1;resolution:=optional,javadoc:1.0
 Plugin-Developers: 
 Libraries: /home/berserker/devel-jenkins/gridmaven/jenkins-grid-testin
  g-plugin/target/classes,/home/berserker/.m2/repository/commons-codec/

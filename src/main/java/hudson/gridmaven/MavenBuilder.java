@@ -25,6 +25,7 @@
 package hudson.gridmaven;
 
 import hudson.gridmaven.Messages;
+import hudson.gridmaven.gridlayer.HadoopInstance;
 import hudson.maven.agent.AbortException;
 import hudson.maven.agent.Main;
 import hudson.maven.agent.PluginManagerListener;
@@ -44,6 +45,12 @@ import java.text.NumberFormat;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.maven.BuildFailureException;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.execution.ReactorManager;
@@ -121,8 +128,9 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
     abstract void onReportGenerated(MavenProject project, MavenReportInfo report) throws IOException, InterruptedException, AbortException;
 
     private Class<?> pluginManagerInterceptorClazz;
-    
+    private Class[] pluginManagerInterceptorListenerClazz;
     private Class<?> lifecycleInterceptorClazz;
+    private Class[] lifecycleInterceptorListenerClazz;
     
     /**
      * This code is executed inside the maven jail process.
@@ -147,7 +155,26 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             markAsSuccess = false;
 
             registerSystemProperties();
-
+            
+            Configuration conf = new Configuration();
+            conf.set("fs.default.name", "hdfs://localhost:9000/");
+            conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
+            conf.set("fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem");
+            
+            Path p = new Path("/");
+            try {
+                FileSystem fs = FileSystem.get(conf);
+                FileStatus[] status = fs.listStatus(p);
+                if (status.length < 1) {
+                    System.out.println("Zero files stored in HDFS");
+                }
+                for (int i = 0; i < status.length; i++) {
+                    System.out.println("Reading file: " + status[i].getPath());
+                }
+            } catch (IOException ex) {
+                Logger.getLogger(HadoopInstance.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            
             listener.getLogger().println(formatArgs(goals));
             int r = Main.launch(goals.toArray(new String[goals.size()]));
 
@@ -202,21 +229,23 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
         IllegalAccessException, InvocationTargetException
     {
         if (pluginManagerInterceptorClazz == null)
-        {
             pluginManagerInterceptorClazz = cl.loadClass( "hudson.maven.agent.PluginManagerInterceptor" );
-        }
+        if (pluginManagerInterceptorListenerClazz == null)    
+            pluginManagerInterceptorListenerClazz = new Class[] { 
+                cl.loadClass( "hudson.maven.agent.PluginManagerListener" ) };
+
         Method setListenerMethod =
-            pluginManagerInterceptorClazz.getMethod( "setListener",
-                                                     new Class[] { cl.loadClass( "hudson.maven.agent.PluginManagerListener" ) } );
+            pluginManagerInterceptorClazz.getMethod( "setListener", pluginManagerInterceptorListenerClazz);
         setListenerMethod.invoke( null, new Object[] { pluginManagerListener } );
 
         if (lifecycleInterceptorClazz == null)
-        {
             lifecycleInterceptorClazz = cl.loadClass( "org.apache.maven.lifecycle.LifecycleExecutorInterceptor" );
-        }
+        if (lifecycleInterceptorListenerClazz == null)   
+            lifecycleInterceptorListenerClazz = new Class[] { 
+                cl.loadClass( "org.apache.maven.lifecycle.LifecycleExecutorListener" ) };
+
         setListenerMethod =
-            lifecycleInterceptorClazz.getMethod( "setListener",
-                                                 new Class[] { cl.loadClass( "org.apache.maven.lifecycle.LifecycleExecutorListener" ) } );
+            lifecycleInterceptorClazz.getMethod( "setListener", lifecycleInterceptorListenerClazz);
 
         setListenerMethod.invoke( null, new Object[] { pluginManagerListener } );
     }

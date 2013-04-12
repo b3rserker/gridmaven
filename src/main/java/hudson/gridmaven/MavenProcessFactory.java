@@ -87,6 +87,18 @@ final class MavenProcessFactory extends AbstractMavenProcessFactory implements P
         return null;
     }
 
+    @Override
+    protected String getHadoopJar(MavenInstallation mvn,
+            boolean isMaster, FilePath slaveRoot) throws IOException,
+            InterruptedException {
+        if(mvn.isMaven2_1(getLauncher())) {
+            return isMaster?
+                Which.jarFile(org.apache.hadoop.fs.LocalFileSystem.class).getAbsolutePath():
+                slaveRoot.child("hadoop-core.jar").getRemote();
+        }
+        return null;
+    }    
+    
     /**
      * Finds classworlds.jar
      */

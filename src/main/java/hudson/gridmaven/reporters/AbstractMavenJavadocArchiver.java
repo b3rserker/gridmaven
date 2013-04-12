@@ -25,11 +25,11 @@
 package hudson.gridmaven.reporters;
 
 import hudson.gridmaven.MavenReporter;
-import hudson.gridmaven.MavenReportInfo;
 import hudson.gridmaven.MojoInfo;
-import hudson.gridmaven.MavenModuleSet;
 import hudson.gridmaven.MavenModule;
 import hudson.gridmaven.MavenBuildProxy;
+import hudson.gridmaven.MavenModuleSet;
+import hudson.gridmaven.MavenReportInfo;
 import hudson.FilePath;
 import hudson.Util;
 import hudson.gridmaven.reporters.Messages;

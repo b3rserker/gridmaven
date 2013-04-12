@@ -32,10 +32,10 @@ THE SOFTWARE.
     <version>1.480.4-SNAPSHOT</version>
   </parent>
 
-  <artifactId>maven-plugin</artifactId>
+  <artifactId>maven-grid-plugin</artifactId>
   <packaging>hpi</packaging>
 
-  <name>Maven Integration plugin</name>
+  <name>Maven Grid plugin</name>
   <description>This plug-in provides deep integration of Jenkins and Maven. This functionality used to be part of the Jenkins core.
   Now it is a plug-in that is installed by default, but can be disabled.</description>
   <url>http://wiki.jenkins-ci.org/display/JENKINS/Maven+2+Project+Plugin</url>
@@ -47,6 +47,7 @@ THE SOFTWARE.
     <aetherVersion>1.13.1</aetherVersion>
     <sisuInjectVersion>2.3.0</sisuInjectVersion>
     <wagonVersion>2.2</wagonVersion>
+    <hadoop.version>0.19.1-hudson-3</hadoop.version>
   </properties>
 
   <issueManagement>
@@ -385,9 +386,15 @@ THE SOFTWARE.
      <artifactId>slf4j-jdk14</artifactId>
      <scope>test</scope>
   </dependency>
-
+    <dependency>
+      <groupId>org.jvnet.hudson.hadoop</groupId>
+      <artifactId>hadoop-core</artifactId>
+      <version>0.19.1-hudson-3</version>
+    </dependency>
   </dependencies>
 
+
+  
   <build>
     <!--
       Since new versions need to overwrite old versions, it's better
@@ -462,7 +469,52 @@ THE SOFTWARE.
           </execution>
         </executions>
       </plugin>
-    </plugins>
+	<plugin>
+                <groupId>org.zeroturnaround</groupId>
+                <artifactId>jrebel-maven-plugin</artifactId>
+                <version>1.1.1</version>
+                <configuration>
+                    <packaging>jar</packaging>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>generate-rebel-xml</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+    
+
+      <plugin>
+        <!-- put hadoop distribution in as a resource -->
+        <groupId>org.jvnet.maven-antrun-extended-plugin</groupId>
+        <artifactId>maven-antrun-extended-plugin</artifactId>
+        <version>1.38</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>process-resources</phase>
+            <configuration>
+              <verifyArtifact>false</verifyArtifact>
+              <tasks>
+                <property name="dest" value="${project.basedir}/target/classes/hudson/gridmaven/gridlayer/" />
+                <mkdir dir="${dest}" />
+                <resolveArtifact groupId="org.jvnet.hudson.hadoop" artifactId="hadoop-core" version="${hadoop.version}" classifier="mini-bin" type="tar.gz" tofile="${dest}/hadoop.tar.gz" />
+                <!-- checksum used for up-to-date check -->
+                <checksum file="${dest}/hadoop.tar.gz" />
+              </tasks>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+</plugins>
+    
+    
   </build>
 
   <profiles>

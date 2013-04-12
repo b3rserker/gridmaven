@@ -41,11 +41,15 @@ import hudson.model.Label;
 import hudson.model.Node;
 import hudson.model.Resource;
 import hudson.model.Saveable;
+import hudson.model.labels.LabelAtom;
+import hudson.model.labels.LabelOperatorPrecedence;
+import hudson.model.labels.LabelVisitor;
 import hudson.tasks.LogRotator;
 import hudson.tasks.Maven.MavenInstallation;
 import hudson.tasks.Publisher;
 import hudson.util.AlternativeUiTextProvider;
 import hudson.util.DescribableList;
+import hudson.util.VariableResolver;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -385,9 +389,10 @@ public class MavenModule extends AbstractMavenProject<MavenModule,MavenBuild> im
      */
     @Override
     public Label getAssignedLabel() {
-        Node n = getParent().getLastBuiltOn();
-        if(n==null) return null;
-        return n.getSelfLabel();
+//        Node n = getParent().getLastBuiltOn();
+//        if(n==null) return null;
+//        return n.getSelfLabel();
+        return null;
     }
 
     /**
@@ -477,7 +482,7 @@ public class MavenModule extends AbstractMavenProject<MavenModule,MavenBuild> im
 
         // if the build style is the aggregator build, define dependencies against project,
         // not module.
-        AbstractProject<?, ?> dest = getParent().isAggregatorStyleBuild() ? getParent() : this;
+        AbstractProject<?, ?> dest = this;
 
         for (ModuleDependency d : dependencies) {
             MavenModule src = myParentsModules.get(d);
@@ -487,7 +492,7 @@ public class MavenModule extends AbstractMavenProject<MavenModule,MavenBuild> im
             
             if(src!=null) {
                 DependencyGraph.Dependency dep = new MavenModuleDependency(
-                        src.getParent().isAggregatorStyleBuild() ? src.getParent() : src,dest);
+                        src,dest);
                 if (!dep.pointsItself())
                     graph.addDependency(dep);
             }

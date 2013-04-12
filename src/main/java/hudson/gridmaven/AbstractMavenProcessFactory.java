@@ -310,6 +310,9 @@ public abstract class AbstractMavenProcessFactory
             args.add(interceptorOverride);
         }
 
+        // Add Hadoop jar eventually
+        args.add(getHadoopJar(mvn,isMaster,slaveRoot));
+        
         return args;
     }
     
@@ -327,6 +330,8 @@ public abstract class AbstractMavenProcessFactory
      * For Maven 2.1.x - 2.2.x we need an additional jar which overrides some classes in the other interceptor jar. 
      */
     protected abstract String getMavenInterceptorOverride(MavenInstallation mvn,boolean isMaster,FilePath slaveRoot) throws IOException, InterruptedException;
+    
+    protected abstract String getHadoopJar(MavenInstallation mvn,boolean isMaster,FilePath slaveRoot) throws IOException, InterruptedException;
     
     /**
      * Returns the name of the Maven main class.

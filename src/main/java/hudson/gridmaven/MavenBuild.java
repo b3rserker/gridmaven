@@ -724,14 +724,14 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
             // backward compatibility
             systemProps.put("hudson.build.number",String.valueOf(getNumber()));
 
-            if (maven3orLater)
-            { 
-                // FIXME here for maven 3 builds
-                listener.getLogger().println("Building single Maven modules is not implemented for Maven 3, yet!");
-                return Result.ABORTED;
-            }
-            else
-            {
+//            if (maven3orLater)
+//            { 
+//                // FIXME here for maven 3 builds
+//                listener.getLogger().println("Building single Maven modules is not implemented for Maven 3, yet!");
+//                return Result.ABORTED;
+//            }
+//            else
+//            {
                 boolean normalExit = false;
                 try {
                     Result r = process.call(new Builder(
@@ -754,7 +754,7 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
                     if (failed) return Result.FAILURE;
                 }
             }
-        }
+//        }
 
         @Override
         public void cleanUp(BuildListener listener) throws Exception {

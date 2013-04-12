@@ -2,7 +2,7 @@
 <hudson>
   <disabledAdministrativeMonitors/>
   <version>1.480.4-SNAPSHOT (private-03/06/2013 23:41 GMT-berserker)</version>
-  <numExecutors>4</numExecutors>
+  <numExecutors>2</numExecutors>
   <mode>NORMAL</mode>
   <useSecurity>true</useSecurity>
   <authorizationStrategy class="hudson.security.AuthorizationStrategy$Unsecured"/>
@@ -19,7 +19,18 @@
       <name>suse1</name>
       <description></description>
       <remoteFS>/test</remoteFS>
-      <numExecutors>2</numExecutors>
+      <numExecutors>1</numExecutors>
+      <mode>NORMAL</mode>
+      <retentionStrategy class="hudson.slaves.RetentionStrategy$Always"/>
+      <launcher class="hudson.slaves.JNLPLauncher"/>
+      <label>suses</label>
+      <nodeProperties/>
+    </slave>
+    <slave>
+      <name>suse2</name>
+      <description></description>
+      <remoteFS>/test</remoteFS>
+      <numExecutors>1</numExecutors>
       <mode>NORMAL</mode>
       <retentionStrategy class="hudson.slaves.RetentionStrategy$Always"/>
       <launcher class="hudson.slaves.JNLPLauncher"/>

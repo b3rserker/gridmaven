@@ -1,4 +1,4 @@
-hudson.maven.reporters.MavenAbstractArtifactRecord$Record
-hudson.maven.reporters.MavenAggregatedArtifactRecord
-hudson.maven.reporters.MavenArtifact
-hudson.maven.reporters.MavenArtifactRecord
+hudson.gridmaven.reporters.MavenAbstractArtifactRecord$Record
+hudson.gridmaven.reporters.MavenAggregatedArtifactRecord
+hudson.gridmaven.reporters.MavenArtifact
+hudson.gridmaven.reporters.MavenArtifactRecord
