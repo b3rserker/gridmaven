@@ -27,12 +27,16 @@ import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.maven.MavenInformation;
 import hudson.gridmaven.Messages;
+import hudson.gridmaven.gridlayer.HadoopInstance;
+import hudson.gridmaven.gridlayer.HadoopSlaveRequestInfo;
+import hudson.gridmaven.gridlayer.PluginImpl;
 import hudson.gridmaven.reporters.MavenArtifactRecord;
 import hudson.gridmaven.reporters.SurefireArchiver;
 import hudson.slaves.WorkspaceList;
 import hudson.slaves.WorkspaceList.Lease;
 import hudson.maven.agent.AbortException;
 import hudson.model.AbstractBuild;
+import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
 import hudson.model.Computer;
 import hudson.model.Descriptor;
@@ -41,13 +45,17 @@ import hudson.model.Executor;
 import hudson.model.Node;
 import hudson.model.Result;
 import hudson.model.Run;
+import hudson.model.Slave;
 import hudson.model.TaskListener;
 import hudson.remoting.Channel;
 import hudson.scm.ChangeLogSet;
 import hudson.scm.ChangeLogSet.Entry;
+import hudson.tasks.BuildStepMonitor;
 import hudson.tasks.BuildWrapper;
+import hudson.tasks.CommandInterpreter;
 import hudson.tasks.Maven.MavenInstallation;
 import hudson.tasks.Publisher;
+import hudson.tasks.Shell;
 import hudson.util.ArgumentListBuilder;
 import hudson.util.DescribableList;
 import hudson.util.IOUtils;
@@ -74,7 +82,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 /**
  * {@link Run} for {@link MavenModule}.
@@ -306,8 +320,10 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
 
         private long startTime;
 
-        public Builder(BuildListener listener,MavenBuildProxy buildProxy,MavenModule module, List<String> goals, Map<String,String> systemProps) {
-            super(listener,Collections.singleton(module),goals,systemProps);
+        public Builder(BuildListener listener,MavenBuildProxy buildProxy,
+                MavenModule module, List<String> goals, 
+                Map<String,String> systemProps, String path, HadoopSlaveRequestInfo h) {
+            super(listener,Collections.singleton(module),goals,systemProps,path,h);
             this.buildProxy = new FilterImpl(buildProxy);
             this.moduleName = module.getModuleName();
         }
@@ -658,15 +674,26 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
 
         @Override
         protected Lease decideWorkspace(Node n, WorkspaceList wsl) throws InterruptedException, IOException {
-            return wsl.allocate(getModuleSetBuild().getModuleRoot().child(getProject().getRelativePath()));
+            //return wsl.allocate(getModuleSetBuild().getModuleRoot().child(getProject().getRelativePath()));
+            //String workspace = lease.path.getRemote();
+            //FilePath fnl = node.createPath(workspace);
+
+            Node node = getCurrentNode();
+            //String workspace = getRemote()
+            
+            FilePath nPath = node.getWorkspaceFor(project.getParent());
+            FilePath f = nPath.child(getProject().getRelativePath());
+            node.createPath(f.getRemote());
+            return wsl.allocate(f); 
         }
 
         protected Result doRun(BuildListener listener) throws Exception {
             // pick up a list of reporters to run
             reporters = getProject().createReporters();
             MavenModuleSet mms = getProject().getParent();
-            if(debug)
-                listener.getLogger().println("Reporters="+reporters);
+            if (debug) {
+                listener.getLogger().println("Reporters=" + reporters);
+            }
 
             for (BuildWrapper w : mms.getBuildWrappersList()) {
                 Environment e = w.setUp(MavenBuild.this, launcher, listener);
@@ -677,31 +704,33 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
             }
 
             EnvVars envVars = getEnvironment(listener); // buildEnvironments should be set up first
-            
+
             MavenInstallation mvn = getProject().getParent().getMaven();
-            
+
             mvn = mvn.forEnvironment(envVars).forNode(Computer.currentComputer().getNode(), listener);
-            
-            MavenInformation mavenInformation = getModuleRoot().act( new MavenVersionCallable( mvn.getHome() ));
-            
+
+            MavenInformation mavenInformation = getModuleRoot().act(new MavenVersionCallable(mvn.getHome()));
+
             String mavenVersion = mavenInformation.getVersion();
 
-            LOGGER.fine(getFullDisplayName()+" is building with mavenVersion " + mavenVersion + " from file " + mavenInformation.getVersionResourcePath());
-            
+            LOGGER.fine(getFullDisplayName() + " is building with mavenVersion " + mavenVersion + " from file " + mavenInformation.getVersionResourcePath());
+
 
             boolean maven3orLater = MavenUtil.maven3orLater(mavenVersion);
 
-            ProcessCache.MavenProcess process = MavenBuild.mavenProcessCache.get( launcher.getChannel(), listener, maven3orLater
-                ? new Maven3ProcessFactory(
-                        getParent().getParent(), launcher, envVars, getMavenOpts(listener, envVars), null )
-                : new MavenProcessFactory(
-                        getParent().getParent(), launcher, envVars, getMavenOpts(listener, envVars), null ));
+            ProcessCache.MavenProcess process = MavenBuild.mavenProcessCache.get(launcher.getChannel(), listener, maven3orLater
+                    ? new Maven3ProcessFactory(
+                    getParent().getParent(), launcher, envVars, getMavenOpts(listener, envVars), null)
+                    : new MavenProcessFactory(
+                    getParent().getParent(), launcher, envVars, getMavenOpts(listener, envVars), null));
 
-            ArgumentListBuilder margs = new ArgumentListBuilder("-N","-B");
+            ArgumentListBuilder margs = new ArgumentListBuilder("-N", "-B");
+
             FilePath localRepo = mms.getLocalRepository().locate(MavenBuild.this);
-            if(localRepo!=null)
-                // the workspace must be on this node, so getRemote() is safe.
-                margs.add("-Dmaven.repo.local="+localRepo.getRemote());
+            if (localRepo != null) // the workspace must be on this node, so getRemote() is safe.
+            {
+                margs.add("-Dmaven.repo.local=" + localRepo.getRemote());
+            }
 
             if (mms.getAlternateSettings() != null) {
                 if (IOUtils.isAbsolute(mms.getAlternateSettings())) {
@@ -709,52 +738,199 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
                 } else {
                     FilePath mrSettings = getModuleRoot().child(mms.getAlternateSettings());
                     FilePath wsSettings = getWorkspace().child(mms.getAlternateSettings());
-                    if (!wsSettings.exists() && mrSettings.exists())
+                    if (!wsSettings.exists() && mrSettings.exists()) {
                         wsSettings = mrSettings;
+                    }
 
                     margs.add("-s").add(wsSettings.getRemote());
                 }
             }
 
 
-            margs.add("-f",getModuleRoot().child("pom.xml").getRemote());
+            for (AbstractProject a : getProject().getDownstreamProjects()) {
+                System.out.println(a.getName());
+            }
+
+            margs.add("-f", getModuleRoot().child("pom.xml").getRemote());
             margs.addTokenized(getProject().getGoals());
 
-            Map<String,String> systemProps = new HashMap<String, String>(envVars);
-            // backward compatibility
-            systemProps.put("hudson.build.number",String.valueOf(getNumber()));
 
-//            if (maven3orLater)
-//            { 
-//                // FIXME here for maven 3 builds
-//                listener.getLogger().println("Building single Maven modules is not implemented for Maven 3, yet!");
-//                return Result.ABORTED;
+            //margs.add("package");
+            //mvn package
+            //mvn install:install-file -Dfile=<path-to-file> -DgroupId=<group-id> -DartifactId=<artifact-id> -Dversion=<version> -Dpackaging=<packaging>
+
+            Map<String, String> systemProps = new HashMap<String, String>(envVars);
+            // backward compatibility
+            systemProps.put("hudson.build.number", String.valueOf(getNumber()));
+            String rel = project.getRelativePath();
+            
+            if (maven3orLater)
+            { 
+                // FIXME here for maven 3 builds
+                listener.getLogger().println("Building single Maven modules is not implemented for Maven 3, yet!");
+                return Result.ABORTED;
+            }
+
+            PluginImpl pl = PluginImpl.get();
+            
+            // Fill object for serialization with necessarry info
+            HadoopSlaveRequestInfo serialInfo = new HadoopSlaveRequestInfo();
+            
+            MavenModule root = project.getParent().getRootModule();
+            serialInfo.mArtifact = project.getModuleName().artifactId;
+            serialInfo.mVersion = project.getVersion();
+            serialInfo.mPackaging = project.getPackaging();
+            serialInfo.hdfsUrl = pl.getHdfsUrl();
+            serialInfo.rArtifact = root.getModuleName().artifactId;
+            serialInfo.rGroupId = root.getModuleName().groupId;
+            serialInfo.rVersion = root.getVersion();
+            serialInfo.rName = serialInfo.rGroupId + "." + serialInfo.rArtifact + "-" + serialInfo.rVersion;
+            serialInfo.jobName = project.getParent().getName();
+            for (AbstractProject it : project.getUpstreamProjects()) {
+                MavenModule a = (MavenModule) it;
+                serialInfo.addUpStreamDep(a.getModuleName().artifactId,
+                        a.getModuleName().groupId,a.getVersion(),a.getPackaging());
+            }
+            serialInfo.mavenExePath = mvn.getExecutable(launcher);
+            Node node = getCurrentNode();
+            FilePath rootPath = node.getWorkspaceFor(project.getParent());
+            String workspace = rootPath.child(getProject().getRelativePath()).getRemote();
+            //serialInfo.entrySet = (Map.Entry<String, String>) getBuildVariables().entrySet();
+            //serialInfo.entrySet = getBuildVariables().entrySet();
+//            
+//            String artifact = project.getModuleName().artifactId;
+//            String version = project.getVersion();
+//            String packaging = project.getPackaging();
+//
+//            // Fetch sources from hdfs repository
+//            String jobName = project.getParent().getName();
+//            MavenModule root = project.getParent().getRootModule();
+//            String rootArtifact = root.getModuleName().artifactId;
+//            String rootGroupId = root.getModuleName().groupId;
+//            String rootVersion = root.getVersion();
+//            String rootName = rootGroupId + "." + rootArtifact + "-" + rootVersion;
+//            String artifact2 = project.getModuleName().artifactId;
+//            String version2 = project.getVersion();
+//            String moduleTar = artifact2 + "-" + version2 + ".tar";
+//            String hdfsSource = "/tar/" + jobName + "/" + rootName + "/" + moduleTar;
+//            //fs.copyToLocalFile(new Path(hdfsSource), new Path(getWorkspace().getRemote()));
+//            
+//            hadoop.getAndUntar(hdfsSource,getWorkspace().getRemote());
+//            hadoop.getFs().copyToLocalFile(new Path(hdfsSource), new Path(getWorkspace().getRemote()));
+//            //File test = new File(getWorkspace().getRemote()+"/hereiam");
+//            //test.mkdir();
+//            listener.getLogger().println("Untared file: "+hdfsSource+" to "+getWorkspace().getRemote());
+//            
+//            // Install artifacts
+//            if (project.getUpstreamProjects().size() > 0) {
+//                listener.getLogger().println("Preinstalling artifacts:\n");
+//                for (AbstractProject A : project.getUpstreamProjects()) {
+//                    MavenModule pr = (MavenModule) A;
+//                    // Fetch deps from hdfs repository
+//                    String artifactName = pr.getModuleName().artifactId + "-" + pr.getVersion()
+//                            + "." + pr.getPackaging();
+//                    Path hdfsPath = new Path("/repository/" + artifactName);
+//                    Path absPath = new Path(getWorkspace() + "/deps");
+//
+//                    boolean success = (new File(getWorkspace() + "/deps")).mkdirs();
+//                    if (!success) {
+//                        IOException e = new IOException();
+//                        e.printStackTrace();
+//                    }
+//
+//                    listener.getLogger().println("Copying from hadoop path: " + hdfsPath + " to local path:" + absPath);
+//                    fs.copyToLocalFile(hdfsPath, absPath);
+//                    //goals.add("package");
+//                    String s = " install:install-file -Dfile=./deps/"
+//                            + pr.getModuleName().artifactId + "-" + pr.getVersion() + "." + pr.getPackaging()
+//                            + " -DgroupId=" + pr.getModuleName().groupId
+//                            + " -DartifactId=" + pr.getModuleName().artifactId
+//                            + " -Dversion=" + pr.getVersion()
+//                            + " -Dpackaging=" + pr.getPackaging();
+//                    listener.getLogger().println("Preinstalling artifact: " + s + "\n");
+//                    Shell b = new Shell(mvn.getExecutable(launcher) + s);
+//                    b.perform(MavenBuild.this, launcher, listener);
+//                }
 //            }
-//            else
-//            {
-                boolean normalExit = false;
-                try {
-                    Result r = process.call(new Builder(
-                        listener,new ProxyImpl(),
-                        getProject(), margs.toList(), systemProps));
-                    normalExit = true;
-                    return r;
-                } finally {
-                    if(normalExit)  process.recycle();
-                    else            process.discard();
-    
-                    // tear down in reverse order
-                    boolean failed=false;
-                    for( int i=buildEnvironments.size()-1; i>=0; i-- ) {
-                        if (!buildEnvironments.get(i).tearDown(MavenBuild.this,listener)) {
-                            failed=true;
-                        }                    
+//            listener.getLogger().println("Artifact installation finished\n");
+//            String projectName = project.getName();
+//            listener.getLogger().println("Vypis nazvu nodu a kde jsem:\n");
+//            Shell c = new Shell("hostname;echo -e \"\";pwd;");
+//            c.perform(MavenBuild.this, launcher, listener);
+//            listener.getLogger().println("\nBuilding standalone module " + projectName + "\n");
+
+            boolean normalExit = false;
+            try {
+                Result r = process.call(new Builder(
+                        listener, new ProxyImpl(),
+                        getProject(), margs.toList(), systemProps, workspace, serialInfo));
+                normalExit = true;
+                return r;
+            } finally {
+                if (normalExit) {
+                    process.recycle();
+                } else {
+                    process.discard();
+                }
+
+                listener.getLogger().println("Module operation finished\n");
+
+                // tear down in reverse order
+                boolean failed = false;
+                for (int i = buildEnvironments.size() - 1; i >= 0; i--) {
+                    if (!buildEnvironments.get(i).tearDown(MavenBuild.this, listener)) {
+                        failed = true;
                     }
-                    // WARNING The return in the finally clause will trump any return before
-                    if (failed) return Result.FAILURE;
+                }
+//                listener.getLogger().println("Packaging...");
+//                Shell b = new Shell(mvn.getExecutable(launcher)
+//                        + " -N -B package -Dmaven.test.skip=true -Dmaven.test.failure.ignore=true");
+//                b.perform(MavenBuild.this, launcher, listener);
+//                listener.getLogger().println("Package created\n");
+//
+//                String absolute = getWorkspace().getRemote();
+//                String relative = absolute.substring(absolute.lastIndexOf('/'), absolute.length());
+//
+//                Path absArtifactPath = new Path(absolute + "/target/" + artifact + "-" + version + "." + packaging);
+//
+//                
+//
+//                List<List<String>> upStreamDeps = new ArrayList<List<String>>();
+//                for (AbstractProject it : project.getUpstreamProjects()) {
+//                    MavenModule m = (MavenModule) it;
+//                    List row = new ArrayList();
+//                    row.add(m.getModuleName().artifactId);
+//                    row.add(m.getVersion());
+//                    row.add(m.getPackaging());
+//                    upStreamDeps.add(row);
+//                }
+//
+//                // Insert compiled artifact to hdfs repository
+//                try {
+//                    if (upStreamDeps.size() > 0) {
+//                        listener.getLogger().println("\nCopying from local path:"
+//                                + absArtifactPath + " to hadoop: /repository/" + artifact + "-" + version + "." + packaging);
+//                        fs.copyFromLocalFile(absArtifactPath, new Path("/repository"));
+//                    } else {
+//                        Path pomPath = new Path(absolute + "/pom.xml");
+//                        listener.getLogger().println("\nCopying from local path:" + pomPath
+//                                + " to hadoop: /repository/" + artifact + "-" + version + "." + packaging);
+//                        fs.copyFromLocalFile(pomPath, new Path("/repository/" + artifact + "-" + version + "." + packaging));
+//                    }
+//                    listener.getLogger().println("Inserting to hadoop finished");
+//                } catch (Exception e) {
+//                    listener.getLogger().println("Failed inserting artifact to hdfs!");
+//                    e.printStackTrace();
+//                    failed = true;
+//                }
+//
+//                FileUtils.deleteDirectory(new File(getWorkspace() + "/deps"));
+                // WARNING The return in the finally clause will trump any return before
+                if (failed) {
+                    return Result.FAILURE;
                 }
             }
-//        }
+        }
 
         @Override
         public void cleanUp(BuildListener listener) throws Exception {

@@ -49,7 +49,7 @@ class DataNodeStartTask implements Callable<Void,IOException> {
 
     public Void call() throws IOException {
         System.out.println("Starting data node");
-
+        //System.setProperty("java.net.preferIPv4Stack" , "true");
         Configuration conf = new Configuration();
         conf.set("fs.default.name",hdfsUrl);
         conf.set("dfs.data.dir",new File(new File(rootPath),"hadoop/datanode").getAbsolutePath());
@@ -62,6 +62,8 @@ class DataNodeStartTask implements Callable<Void,IOException> {
         // TODO: make this configurable
         // make room for builds
         conf.setLong("dfs.datanode.du.reserved",1L*1024*1024*1024);
+        //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-default.xml"));
+        //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-site.xml"));
 
         DataNode dn = DataNode.instantiateDataNode(new String[0],conf);
         DataNode.runDatanodeDaemon(dn);

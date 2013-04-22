@@ -312,6 +312,7 @@ public abstract class AbstractMavenProcessFactory
 
         // Add Hadoop jar eventually
         args.add(getHadoopJar(mvn,isMaster,slaveRoot));
+        args.add(getCompressJar(mvn,isMaster,slaveRoot));
         
         return args;
     }
@@ -332,6 +333,8 @@ public abstract class AbstractMavenProcessFactory
     protected abstract String getMavenInterceptorOverride(MavenInstallation mvn,boolean isMaster,FilePath slaveRoot) throws IOException, InterruptedException;
     
     protected abstract String getHadoopJar(MavenInstallation mvn,boolean isMaster,FilePath slaveRoot) throws IOException, InterruptedException;
+    
+    protected abstract String getCompressJar(MavenInstallation mvn,boolean isMaster,FilePath slaveRoot) throws IOException, InterruptedException; 
     
     /**
      * Returns the name of the Maven main class.

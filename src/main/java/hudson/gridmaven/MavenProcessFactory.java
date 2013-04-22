@@ -99,6 +99,18 @@ final class MavenProcessFactory extends AbstractMavenProcessFactory implements P
         return null;
     }    
     
+    @Override
+    protected String getCompressJar(MavenInstallation mvn,
+            boolean isMaster, FilePath slaveRoot) throws IOException,
+            InterruptedException {
+        if(mvn.isMaven2_1(getLauncher())) {
+            return isMaster?
+                Which.jarFile(org.apache.commons.compress.archivers.tar.TarArchiveEntry.class).getAbsolutePath():
+                slaveRoot.child("commons-compress.jar").getRemote();
+        }
+        return null;
+    }      
+    
     /**
      * Finds classworlds.jar
      */

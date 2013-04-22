@@ -72,8 +72,10 @@ public class Maven3Builder extends AbstractMavenBuilder implements DelegatingCal
     
     HudsonMavenExecutionResult mavenExecutionResult;    
     
-    protected Maven3Builder(BuildListener listener,Map<ModuleName,ProxyImpl2> proxies, Collection<MavenModule> modules, List<String> goals, Map<String, String> systemProps, MavenBuildInformation mavenBuildInformation) {
-        super( listener, modules, goals, systemProps );
+    protected Maven3Builder(BuildListener listener,Map<ModuleName,ProxyImpl2> proxies,
+            Collection<MavenModule> modules, List<String> goals, Map<String,
+                    String> systemProps, MavenBuildInformation mavenBuildInformation) {
+        super( listener, modules, goals, systemProps);
         this.sourceProxies.putAll(proxies);
         this.proxies = new HashMap<ModuleName, FilterImpl>();
         for (Entry<ModuleName,ProxyImpl2> e : this.sourceProxies.entrySet()) {

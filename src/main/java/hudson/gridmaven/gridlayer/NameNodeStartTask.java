@@ -31,6 +31,7 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import org.apache.hadoop.fs.Path;
 
 /**
  * Starts a {@link NameNode}.
@@ -56,7 +57,7 @@ class NameNodeStartTask implements Callable<Void,IOException> {
         // location of the name node
         conf.set("fs.default.name",hdfsUrl);
         conf.set("dfs.http.address", "0.0.0.0:"+HTTP_PORT);
-        // namespace node stores information hereconf.set("dfs.namenode.logging.level","ALL");
+        // namespace node stores information here
         File namedir = new File(hadoopRoot, "namedir");
         if(namedir.mkdirs())
             format = true;
@@ -70,6 +71,8 @@ class NameNodeStartTask implements Callable<Void,IOException> {
 
         conf.setInt("dfs.replication",1);
         conf.set("dfs.safemode.extension", "1");
+        //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-default.xml"));
+        //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-site.xml"));
         if(format) {
             System.out.println("Formatting HDFS");
             NameNode.format(conf);

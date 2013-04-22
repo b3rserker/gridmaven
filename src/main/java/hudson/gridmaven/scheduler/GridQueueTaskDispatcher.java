@@ -23,12 +23,12 @@ public class GridQueueTaskDispatcher extends QueueTaskDispatcher {
             
             // If it's gridproject, we will schedule
             if (t instanceof hudson.gridmaven.MavenModuleSet || t instanceof hudson.gridmaven.MavenModule){
-                if (item.task instanceof MavenModuleSet && !(node instanceof Jenkins))
-                    return new BecauseOfSmartJenkinsSchedule();
-                else if (item.task instanceof MavenModule && !node.getNodeName().contains("suse")) {
+                if (item.task instanceof MavenModuleSet && (node instanceof Jenkins))
+                    return null;
+                else if (item.task instanceof MavenModule && node.getNodeName().contains("suse")) {
                     return null;
                 }
-                return null;
+                return new BecauseOfSmartJenkinsSchedule();
             }
             
             // Not a grid project

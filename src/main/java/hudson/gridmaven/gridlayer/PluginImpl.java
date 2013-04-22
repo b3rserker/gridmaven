@@ -34,7 +34,12 @@ import hudson.model.TaskListener;
 import hudson.remoting.Channel;
 import hudson.slaves.Channels;
 import hudson.util.ClasspathBuilder;
+import hudson.util.IOUtils;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -44,6 +49,9 @@ import java.net.URL;
 import java.util.Collections;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
@@ -60,6 +68,8 @@ public class PluginImpl extends Plugin {
     private Configuration nameConf;
     private Configuration dataConf;
     private boolean format = Boolean.getBoolean("hadoop.format");
+    private HadoopInstance hadoop;
+    private boolean hadoopInstantiated = false;
     
     @Override
     public void start() throws Exception {
@@ -224,6 +234,11 @@ public class PluginImpl extends Plugin {
             System.out.println("Formatting HDFS");
             NameNode.format(nameConf);
         }
+        // Hadoop adds all project files recursively to storage when job starts
+
+        //String projectRoot = getWorkspace().getRemote() + File.separator + root.getRelativePath();
+        //hadoop.quickAdd(projectRoot);
+        //hadoop.listFiles("/");
     }
 
     @Override
@@ -244,5 +259,18 @@ public class PluginImpl extends Plugin {
     public static final int HTTP_PORT = 50070;
 
     private static final Logger LOGGER = Logger.getLogger(PluginImpl.class.getName());    
+
+    // Workaround hdfs bug, there must be passed class with hdfs libs classloaded
+    // otherwise hdfs internal classloader cannot find sources!
+    public HadoopInstance initHdfs(Class c) {
+        hadoop = new HadoopInstance(c);
+        hadoopInstantiated = true;
+        return hadoop;
+    }
     
+    public HadoopInstance getHdfs(Class c) {
+        if (!hadoopInstantiated)
+            return initHdfs(c);
+        return hadoop;
+    }
 }

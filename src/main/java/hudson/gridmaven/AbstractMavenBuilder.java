@@ -26,6 +26,7 @@ package hudson.gridmaven;
 import hudson.Launcher;
 import hudson.gridmaven.MavenBuild.ProxyImpl2;
 import hudson.gridmaven.Messages;
+import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
 import hudson.model.Executor;
 import hudson.model.Result;
@@ -36,8 +37,11 @@ import hudson.remoting.Future;
 import java.io.IOException;
 import java.io.Serializable;
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -82,14 +86,41 @@ public abstract class AbstractMavenBuilder implements DelegatingCallable<Result,
      */
     protected transient /*final*/ List<Future<?>> futures;
     
-    protected AbstractMavenBuilder(BuildListener listener, Collection<MavenModule> modules, List<String> goals, Map<String, String> systemProps) {
+    protected String packaging;
+    protected String artifact;
+    protected String grouipId;
+    protected String version;
+    protected int nestedLevel;
+    protected String relPath;
+    protected List<List<String>> upStreamDeps = new ArrayList<List<String>>();
+    
+    protected AbstractMavenBuilder(BuildListener listener, Collection<MavenModule> modules,
+            List<String> goals, Map<String, String> systemProps) {
         this.listener = listener;
         this.goals = goals;
         this.systemProps = systemProps;
         
+        // This has only one module!
+        System.out.println("VYPIS MODULU:");
         for (MavenModule m : modules) {
+            System.out.println(m.getName());
             reporters.put(m.getModuleName(),m.createReporters());
+            packaging=m.getPackaging();
+            grouipId=m.getModuleName().groupId;
+            artifact = m.getModuleName().artifactId;
+            version = m.getVersion();
+            nestedLevel = m.nestLevel;
+            relPath = m.getRelativePath();
+            for (AbstractProject it : m.getUpstreamProjects()) {
+                MavenModule a = (MavenModule) it;
+                List row = new ArrayList();
+                row.add(a.getModuleName().artifactId);
+                row.add(a.getVersion());
+                row.add(a.getPackaging());
+                upStreamDeps.add(row);
+            }
         }
+        
     }
     
     /**

@@ -84,6 +84,11 @@ public class Maven3ProcessFactory extends AbstractMavenProcessFactory implements
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
+    @Override
+    protected String getCompressJar(MavenInstallation mvn, boolean isMaster, FilePath slaveRoot) throws IOException, InterruptedException {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }    
+    
     /**
      * Finds classworlds.jar
      */

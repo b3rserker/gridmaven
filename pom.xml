@@ -391,6 +391,12 @@ THE SOFTWARE.
       <artifactId>hadoop-core</artifactId>
       <version>0.19.1-hudson-3</version>
     </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-compress</artifactId>
+      <version>1.0</version>
+      <type>jar</type>
+    </dependency>
   </dependencies>
 
 

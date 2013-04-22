@@ -24,8 +24,13 @@
  */
 package hudson.gridmaven;
 
-import hudson.gridmaven.Messages;
-import hudson.gridmaven.gridlayer.HadoopInstance;
+
+import hudson.FilePath;
+import hudson.Functions;
+import hudson.Launcher;
+import hudson.Util;
+import hudson.gridmaven.gridlayer.HadoopSlaveRequestInfo;
+import hudson.gridmaven.gridlayer.HadoopSlaveRequestInfo.UpStreamDep;
 import hudson.maven.agent.AbortException;
 import hudson.maven.agent.Main;
 import hudson.maven.agent.PluginManagerListener;
@@ -35,9 +40,16 @@ import hudson.model.Result;
 import hudson.remoting.Callable;
 import hudson.remoting.Channel;
 import hudson.remoting.DelegatingCallable;
+import hudson.remoting.VirtualChannel;
 import hudson.util.IOException2;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -47,7 +59,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -87,9 +102,17 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
      * the setting at master.
      */
     private final boolean profile = MavenProcessFactory.profile;
+    
+    // Hadoop builpath of this specific module
+    private final String buildPath;
+    private final HadoopSlaveRequestInfo info;
+    FileSystem fs;
 
-    protected MavenBuilder(BuildListener listener, Collection<MavenModule> modules, List<String> goals, Map<String, String> systemProps) {
-        super( listener, modules, goals, systemProps );
+    protected MavenBuilder(BuildListener listener, Collection<MavenModule> modules,
+            List<String> goals, Map<String, String> systemProps, String buildPath, HadoopSlaveRequestInfo hadoopData) {
+        super( listener, modules, goals, systemProps);
+        this.buildPath = buildPath;
+        this.info = hadoopData;
     }
 
     /**
@@ -142,7 +165,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
         ClassLoader mavenJailProcessClassLoader = Thread.currentThread().getContextClassLoader();        
         
         try {
-
+            PrintStream logger = listener.getLogger();
             initializeAsynchronousExecutions();
             Adapter a = new Adapter(this);
             callSetListenerWithReflectOnInterceptors( a, mavenJailProcessClassLoader );
@@ -155,29 +178,104 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             markAsSuccess = false;
 
             registerSystemProperties();
-            
+
+            // ####### Hadoop stuff start
             Configuration conf = new Configuration();
-            conf.set("fs.default.name", "hdfs://localhost:9000/");
+            conf.set("fs.default.name", info.hdfsUrl);
             conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
             conf.set("fs.file.impl", "org.apache.hadoop.fs.LocalFileSystem");
-            
-            Path p = new Path("/");
-            try {
-                FileSystem fs = FileSystem.get(conf);
-                FileStatus[] status = fs.listStatus(p);
-                if (status.length < 1) {
-                    System.out.println("Zero files stored in HDFS");
-                }
-                for (int i = 0; i < status.length; i++) {
-                    System.out.println("Reading file: " + status[i].getPath());
-                }
-            } catch (IOException ex) {
-                Logger.getLogger(HadoopInstance.class.getName()).log(Level.SEVERE, null, ex);
-            }
-            
-            listener.getLogger().println(formatArgs(goals));
-            int r = Main.launch(goals.toArray(new String[goals.size()]));
+            String moduleTar = info.mArtifact + "-" + info.mVersion + ".tar";
+            String hdfsSource = "/tar/" + info.jobName + "/" + info.rName + "/" + moduleTar;
+            fs = FileSystem.get(conf);
 
+            String installCommand = "";
+
+            // Untar
+            logger.println("Untaring...");
+            try {
+                getAndUntar(fs, hdfsSource, buildPath);
+            } catch (Exception fe) {
+                logger.println("Source data for this module not found in hdfs repository or hdfs error. Please try rebuild main project.");
+                //fe.printStackTrace();
+                return Result.FAILURE;
+            }
+            logger.println("Untared file: " + hdfsSource + " to " + buildPath + "\n");
+
+            // Check if repository exists + HDFS working?
+            Path repo = new Path("/repository");
+            FileStatus[] status = fs.listStatus(repo);
+            if (status != null) {
+                if (status.length < 1) {
+                    logger.println("Zero files stored in HDFS");
+                }
+//                // Print files stored in hdfs for debug
+//                for (int i = 0; i < status.length; i++) {
+//                    logger.println("Reading file: " + status[i].getPath());
+//                }
+            }
+            else{
+                logger.println("Creating hdfs repository.");
+                if (!fs.mkdirs(repo)){
+                    logger.println("Cannot create hdfs repository");
+                    return Result.FAILURE;
+                }
+            }
+
+            // Install artifacts
+            logger.println("Preinstalling artifacts:");
+            for (UpStreamDep dep : info.upStreamDeps) {
+
+                // Fetch deps from hdfs repository
+                String artifactName = dep.art + "-" + dep.ver
+                        + "." + dep.pkg;
+                Path hdfsPath = new Path("/repository/" + artifactName);
+                Path absPath = new Path(buildPath + "/deps");
+
+                boolean success = (new File(buildPath + "/deps")).mkdirs();
+                if (!success) {
+                    //IOException e = new IOException();
+                    //e.printStackTrace();
+                }
+
+                logger.println("Copying from hadoop path: " + hdfsPath + " to local path:" + absPath);
+                try{
+                    fs.copyToLocalFile(hdfsPath, absPath);
+                }
+                catch(IOException e){
+                    logger.println("Prerequisite artifact needed for module build missing: "+artifactName);
+                    return Result.FAILURE;
+                }
+                //goals.add("package");
+                String s = "install:install-file -Dfile=./deps/"
+                        + dep.art + "-" + dep.ver + "." + dep.pkg
+                        + " -DgroupId=" + dep.group
+                        + " -DartifactId=" + dep.art
+                        + " -Dversion=" + dep.ver
+                        + " -Dpackaging=" + dep.pkg;
+                logger.println("Preinstalling artifact: " + s + "\n");
+                //Shell b = new Shell(mvn.getExecutable(launcher) + s);
+                //b.perform(MavenBuild.this, launcher, listener);
+                installCommand += info.mavenExePath + " " + s + ";";
+            }
+
+            logger.println("Executing: " + installCommand);
+            try {
+                if (!performWrapper(installCommand)) {
+                    logger.println("Artifact installation failed!");
+                }
+            } catch (Exception e) {
+                logger.println("Execute process of installing artifacts to local repository failed: "+installCommand);
+                e.printStackTrace();
+                return Result.FAILURE;
+            }
+            logger.println("Artifact installation finished.");
+
+            // ####### EOF Hadoop stuff, maven plugin continues
+            
+            // Lauch MAIN maven process
+            logger.println(formatArgs(goals));
+            int r = Main.launch(goals.toArray(new String[goals.size()]));           
+            
             // now check the completion status of async ops
             long startTime = System.nanoTime();
             
@@ -190,17 +288,56 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
 
             if(profile) {
                 NumberFormat n = NumberFormat.getInstance();
-                PrintStream logger = listener.getLogger();
                 logger.println("Total overhead was "+format(n,a.overheadTime)+"ms");
                 Channel ch = Channel.current();
                 logger.println("Class loading "   +format(n,ch.classLoadingTime.get())   +"ms, "+ch.classLoadingCount+" classes");
                 logger.println("Resource loading "+format(n,ch.resourceLoadingTime.get())+"ms, "+ch.resourceLoadingCount+" times");                
             }
+            
+            // Building successfully finished?
+            if(r!=0)    return Result.FAILURE;
+            
+            // ####### Hadoop stuff
+            // Package artifact
+            logger.println("Packaging...");
+            try {
+                performWrapper(info.mavenExePath + " -N -B package -Dmaven.test.skip=true -Dmaven.test.failure.ignore=true");
+            } catch (InterruptedException ex) {
+                logger.println("Artifact packaging failed!");
+                Logger.getLogger(MavenBuilder.class.getName()).log(Level.SEVERE, null, ex);
+                return Result.FAILURE;
+            }
+            logger.println("Package created\n");
+
+            // Insert compiled artifact to hdfs repository
+            String absolute = buildPath;
+            String relative = absolute.substring(absolute.lastIndexOf('/'), absolute.length());
+            Path absArtifactPath = new Path(absolute + "/target/" + artifact + "-" + version + "." + packaging);
+            
+            try {
+                if (upStreamDeps.size() > 0) {
+                    logger.println("\nCopying from local path:"
+                            + absArtifactPath + " to hadoop: /repository/" + artifact + "-" + version + "." + packaging);
+                    fs.copyFromLocalFile(absArtifactPath, new Path("/repository"));
+                } else {
+                    Path pomPath = new Path(absolute + "/pom.xml");
+                    logger.println("\nCopying from local path:" + pomPath
+                            + " to hadoop: /repository/" + artifact + "-" + version + "." + packaging);
+                    fs.copyFromLocalFile(pomPath, new Path("/repository/" + artifact + "-" + version + "." + packaging));
+                }
+            } catch (Exception e) {
+                logger.println("Failed to insert packaged artifact to hdfs repository!");
+                e.printStackTrace();
+                return Result.FAILURE;
+            }
+            
+            logger.println("Inserting to hadoop finished"); 
+            // ####### EOF Hadoop stuff, maven plugin continues      
 
             if(r==0)    return Result.SUCCESS;
 
             if(markAsSuccess) {
-                listener.getLogger().println(Messages.MavenBuilder_Failed());
+                logger.println(Messages.MavenBuilder_Failed());
                 return Result.SUCCESS;
             }
             return Result.FAILURE;
@@ -214,14 +351,16 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             throw new IOException2(e);
         } catch (ClassNotFoundException e) {
             throw new IOException2(e);
+        } catch (NoSuchRealmException ex) {
+            throw new IOException2(ex);
         }
-        catch ( NoSuchRealmException e ) {
-            throw new IOException2(e);
-        } finally {
+        finally {
+            
             //PluginManagerInterceptor.setListener(null);
             //LifecycleExecutorInterceptor.setListener(null);
             callSetListenerWithReflectOnInterceptorsQuietly( null, mavenJailProcessClassLoader );
         }
+
     }
 
     private void callSetListenerWithReflectOnInterceptors( PluginManagerListener pluginManagerListener, ClassLoader cl )
@@ -357,6 +496,119 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                 listener.postModule(lastModule);
                 lastModule = null;
             }
+        }
+    }
+    
+    public void getAndUntar(FileSystem fs, String src, String targetPath) throws FileNotFoundException, IOException {
+        BufferedOutputStream dest = null;
+        InputStream tarArchiveStream = new FSDataInputStream(fs.open(new Path(src)));
+        TarArchiveInputStream tis = new TarArchiveInputStream(new BufferedInputStream(tarArchiveStream));
+        TarArchiveEntry entry = null;
+        try {
+            while ((entry = tis.getNextTarEntry()) != null) {
+                int count;
+                File outputFile = new File(targetPath, entry.getName());
+
+                if (entry.isDirectory()) { // entry is a directory
+                    if (!outputFile.exists()) {
+                        outputFile.mkdirs();
+                    }
+                } else { // entry is a file
+                    byte[] data = new byte[BUFFER_MAX];
+                    FileOutputStream fos = new FileOutputStream(outputFile);
+                    dest = new BufferedOutputStream(fos, BUFFER_MAX);
+                    while ((count = tis.read(data, 0, BUFFER_MAX)) != -1) {
+                        dest.write(data, 0, count);
+                    }
+                    dest.flush();
+                    dest.close();
+                }
+            }
+        } catch(Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (dest != null) {
+                dest.flush();
+                dest.close();
+            }
+            tis.close();
+        }
+    }
+    public static final int BUFFER_MAX = 2048;
+    
+    public boolean performWrapper(String command) throws InterruptedException {
+        FilePath ws = new FilePath(new File(buildPath));
+//        String command = "mkdir hello";
+        command = fixCrLf(command);
+        FilePath script = null;
+        try {
+            script = ws.createTextTempFile("hudson", ".sh", addCrForNonASCII(fixCrLf(command)), false);
+        } catch (IOException e) {
+            Util.displayIOException(e, listener);
+            e.printStackTrace(listener.fatalError(hudson.tasks.Messages.CommandInterpreter_UnableToProduceScript()));
+            return false;
+        }
+        int r;
+        try {
+//            EnvVars envVars = new EnvVars();
+//            for (Map.Entry<String, String> e : info.entrySet) {
+//                envVars.put(e.getKey(), e.getValue());
+//            }
+            Launcher launcher = ws.createLauncher(listener);
+            //r = launcher.launch().cmds("echo").envs(envVars).stdout(logger).pwd(ws).join();
+            r = launcher.launch().cmds(buildCommandLine(script, command)).stdout(listener).pwd(ws).join();
+        } catch (IOException e) {
+            Util.displayIOException(e, listener);
+            e.printStackTrace(listener.fatalError(hudson.tasks.Messages.CommandInterpreter_CommandFailed()));
+            r = -1;
+        }
+        return r == 0;
+    }
+    
+    private static String addCrForNonASCII(String s) {
+        if(!s.startsWith("#!")) {
+            if (s.indexOf('\n')!=0) {
+                return "\n" + s;
+            }
+        }
+        return s;
+    }        
+
+    private static String fixCrLf(String s) {
+        // eliminate CR
+        int idx;
+        while((idx=s.indexOf("\r\n"))!=-1)
+            s = s.substring(0,idx)+s.substring(idx+1);
+        return s;
+    }    
+
+    public String[] buildCommandLine(FilePath script, String command) {
+        return new String[]{getShellOrDefault(script.getChannel()), "-xe", script.getRemote()};
+    }
+
+    public String getShellOrDefault(VirtualChannel channel) {
+        String interpreter = null;
+        try {
+            interpreter = channel.call(new Shellinterpreter());
+        } catch (IOException ex) {
+            Logger.getLogger(MavenBuilder.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(MavenBuilder.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        if (interpreter == null) {
+            interpreter = getShellOrDefault();
+        }
+        return interpreter;
+    }
+
+    public String getShellOrDefault() {
+        return Functions.isWindows() ? "sh" : "/bin/sh";
+    }
+
+    private static final class Shellinterpreter implements Callable<String, IOException> {
+        private static final long serialVersionUID = 1L;
+        public String call() throws IOException {
+            return Functions.isWindows() ? "sh" : "/bin/sh";
         }
     }
 

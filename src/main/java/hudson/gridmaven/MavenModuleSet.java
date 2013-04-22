@@ -81,6 +81,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -425,9 +426,22 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
      * or all enabeld modules (if disabled==false)
      */
     public List<MavenModule> getDisabledModules(boolean disabled) {
-        if(!disabled && sortedActiveModules!=null)
-            return sortedActiveModules;
 
+        if (!disabled && sortedActiveModules != null) {
+            // Sort hierarchically
+            Collections.sort(sortedActiveModules, new Comparator<MavenModule>() {
+                public int compare(MavenModule o1, MavenModule o2) {
+                    if (o1.depLevel > o2.depLevel) {
+                        return 1;
+                    } else if (o1.depLevel < o2.depLevel) {
+                        return -1;
+                    }
+                    return 0;
+                }
+            });
+            return sortedActiveModules;
+        }
+        
         List<MavenModule> r = new ArrayList<MavenModule>();
         for (MavenModule m : modules.values()) {
             if(m.isDisabled()==disabled)
@@ -439,7 +453,7 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
     public Indenter<MavenModule> createIndenter() {
         return new Indenter<MavenModule>() {
             protected int getNestLevel(MavenModule job) {
-                return job.nestLevel;
+                return job.depLevel;
             }
         };
     }

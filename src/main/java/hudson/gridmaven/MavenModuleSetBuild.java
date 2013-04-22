@@ -35,6 +35,7 @@ import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.FilePath.FileCallable;
 import hudson.Util;
+import hudson.console.ModelHyperlinkNote;
 import hudson.maven.MavenEmbedder;
 import hudson.maven.MavenEmbedderException;
 import hudson.maven.MavenInformation;
@@ -71,6 +72,7 @@ import hudson.util.IOUtils;
 import hudson.util.StreamTaskListener;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.PrintStream;
@@ -100,6 +102,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuildingException;
+import org.apache.tools.tar.TarOutputStream;
 import org.codehaus.plexus.util.PathTool;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.StaplerResponse;
@@ -603,14 +606,11 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                 parsePoms(listener, logger, envVars, mvn, mavenVersion);
                 
                 PluginImpl pl = PluginImpl.get();
+                HadoopInstance hadoop = pl.initHdfs(this.getClass());
+                //hadoop.setClass(this.getClass());
                 MavenModule root = project.getRootModule(); 
-
-                // Hadoop adds all project files recursively to storage when job starts
-                HadoopInstance hadoop = new HadoopInstance();
-                String projectRoot = getWorkspace().getRemote() + File.separator + root.getRelativePath();
-                hadoop.quickAdd(projectRoot);
-                hadoop.listFiles("/");
-
+                hadoop.listFiles("/",logger);
+                
                 //root.setAssignedNode(nodes);
                 root.scheduleBuild(new UpstreamCause((Run<?,?>)MavenModuleSetBuild.this));
                 
@@ -626,40 +626,64 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                         return graph.compare(rhs.getDownstreamProject(), lhs.getDownstreamProject());
                     }
                 });
-                
-                
 
-//                List<MavenModule> mod = project.sortedActiveModules;
-//                for (MavenModule m : project.sortedActiveModules) {
-//                    MavenBuild mb = m.newBuild();
-//                    // JENKINS-8418
-//                    mb.setBuiltOnStr( getBuiltOnStr() );
-//                    // Check if incrementalBuild is selected and that there are changes -
-//                    mb.setWorkspace(getModuleRoot().child(m.getRelativePath()));
-//                    //proxies.put(m.getModuleName(), mb.new ProxyImpl2(MavenModuleSetBuild.this,slistener));
-//                }                
+                String jobName = project.getName();
+                String rootArtifact = root.getModuleName().artifactId;
+                String rootGroupId = root.getModuleName().groupId;
+                String rootVersion = root.getVersion();
+                String rootName = rootGroupId +"."+ rootArtifact +"-"+ rootVersion;
+
+                for (MavenModule m : project.sortedActiveModules) {
+                    String modulePath = getWorkspace() + File.separator + m.getRelativePath();
+                    String artifact = m.getModuleName().artifactId;
+                    String version = m.getVersion();
+                    String moduleTar = artifact + "-" + version + ".tar";
+                    //String tarSrc = modulePath + File.separator + moduleTar;
+                    String hdfsPath = "/tar/" + jobName + "/" + rootName + "/" + moduleTar;
+
+                    // Tar project modules and insert to hdfs, but not root folder
+                    if (m.depLevel > 0) {//&& m.getName().contains("build")) {
+                        logger.println("Tarring: " + moduleTar);
+                        hadoop.tarAndInsert(modulePath, hdfsPath);
+                        logger.println("Inserting tar to hfds: " + hdfsPath);
+                    } 
+                    else {
+                        logger.println("Tarring root module: " + moduleTar);
+                        hadoop.tarAndInsert(modulePath+"/pom.xml", hdfsPath);
+                        logger.println("Inserting tar to hfds: " + hdfsPath);
+                    }
+                }     
                 
-//                for (DependencyGraph.Dependency dep : downstreamProjects) {
-//                    AbstractProject p = dep.getDownstreamProject();
-//                    if (p.isDisabled()) {
-//                        logger.println(hudson.tasks.Messages.
-//                                BuildTrigger_Disabled(ModelHyperlinkNote.encodeTo(p)));
-//                        continue;
-//                    }
-//                    List<Action> buildActions = new ArrayList<Action>();
+                for (DependencyGraph.Dependency dep : downstreamProjects) {
+                    AbstractProject p = dep.getDownstreamProject();
+                    if (p.isDisabled()) {
+                        logger.println(hudson.tasks.Messages.
+                                BuildTrigger_Disabled(ModelHyperlinkNote.encodeTo(p)));
+                        continue;
+                    }
+
+                    List<Action> buildActions = new ArrayList<Action>();
                     //if (dep.shouldTriggerBuild(root.getLastBuild(), listener, buildActions)) {
-                        // this is not completely accurate, as a new build might be triggered
-                        // between these calls
-                        
-//                        String name = ModelHyperlinkNote.encodeTo(p)+" #"+p.getNextBuildNumber();
-//                        if(p.scheduleBuild(p.getQuietPeriod(), new UpstreamCause((Run)this.getBuild()),
-//                                           buildActions.toArray(new Action[buildActions.size()]))) {
-//                            logger.println(hudson.tasks.Messages.BuildTrigger_Triggering(name));
-//                        } else {
-//                            logger.println(hudson.tasks.Messages.BuildTrigger_InQueue(name));
-//                        }
-                    //}
-                
+                        String name = ModelHyperlinkNote.encodeTo(p)+" #"+p.getNextBuildNumber();
+                        List<AbstractProject> u = p.getUpstreamProjects();
+                        List<String> auNames = new ArrayList<String>();
+                        List<String> adNames = new ArrayList<String>();
+                        for (AbstractProject a: u){
+                            auNames.add(a.getName());
+                        }
+                        List<AbstractProject> d = p.getDownstreamProjects();
+                        for (AbstractProject a: d){
+                            adNames.add(a.getName());
+                        }
+                        String aProjectName = p.getName();
+                        p.setBlockBuildWhenUpstreamBuilding(true);
+                        if(p.scheduleBuild(p.getQuietPeriod(), new UpstreamCause((Run)this.getBuild()),
+                                           buildActions.toArray(new Action[buildActions.size()]))) {
+                            logger.println(hudson.tasks.Messages.BuildTrigger_Triggering(name));
+                        } else {
+                            logger.println(hudson.tasks.Messages.BuildTrigger_InQueue(name));
+                        }
+                }
                 return r;
             }catch (AbortException e) {
                 if(e.getMessage()!=null)
@@ -767,6 +791,7 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                 throw new AbortException();
             }
             
+            // TODO always upgrade
             boolean needsDependencyGraphRecalculation = false;
 
             // update the module list
@@ -821,6 +846,10 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
             // module builds must start with this build's number
             for (MavenModule m : modules.values())
                 m.updateNextBuildNumber(getNumber());
+            
+            // module builds must start with this build's number
+            for (MavenModule m : modules.values())
+                m.rebuildDepLevel();
         }
 
         protected void post2(BuildListener listener) throws Exception {

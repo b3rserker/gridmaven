@@ -31,6 +31,7 @@ import hudson.gridmaven.reporters.MavenMailer;
 import hudson.model.AbstractProject;
 import hudson.model.Action;
 import hudson.model.DependencyGraph;
+import hudson.model.DependencyGraph.Dependency;
 import hudson.model.Descriptor;
 import hudson.model.Descriptor.FormException;
 import hudson.model.Item;
@@ -136,12 +137,13 @@ public class MavenModule extends AbstractMavenProject<MavenModule,MavenBuild> im
      */
     @CopyOnWrite
     private volatile List<ModuleName> children;
-
+      
     /**
      * Nest level used to display this module in the module list.
      * The root module and orphaned module gets 0.
      */
-    /*package*/ volatile transient int nestLevel;
+    /*package*/ public volatile transient int nestLevel;
+    public int depLevel;
 
     /*package*/ MavenModule(MavenModuleSet parent, PomInfo pom, int firstBuildNumber) throws IOException {
         super(parent, pom.name.toFileSystemName());
@@ -149,6 +151,22 @@ public class MavenModule extends AbstractMavenProject<MavenModule,MavenBuild> im
         updateNextBuildNumber(firstBuildNumber);
     }
 
+    int rebuildDepLevel() {
+        if (getName().contains("remote")){
+            getUpstreamProjects();
+        }
+        List<AbstractProject> up = getUpstreamProjects();
+        int level = -1;
+        for (int i =0;i<up.size();i++ ) {
+            AbstractProject d = up.get(i);
+            int m = ((MavenModule) d).rebuildDepLevel();
+            if (m>level)
+                level = m;
+        }
+        depLevel = ++level;
+        return depLevel;        
+    }
+    
     /**
      * {@link MavenModule} follows the same log rotation schedule as its parent. 
      */
@@ -156,7 +174,16 @@ public class MavenModule extends AbstractMavenProject<MavenModule,MavenBuild> im
     public LogRotator getLogRotator() {
         return getParent().getLogRotator();
     }
-
+    
+    
+    public String getPackaging() {
+        if (!"jar".equals(packaging) && !"war".equals(packaging) 
+                && !"pom".equals(packaging) && !"ear".equals(packaging))
+            return "jar";
+        else
+            return packaging;
+    }
+    
     /**
      * @deprecated
      *      Not allowed to configure log rotation per module.

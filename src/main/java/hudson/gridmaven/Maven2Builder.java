@@ -54,13 +54,11 @@ import org.apache.maven.project.MavenProject;
 final class Maven2Builder extends MavenBuilder {
     private final Map<ModuleName,List<ExecutedMojo>> executedMojos = new HashMap<ModuleName,List<ExecutedMojo>>();
     private long mojoStartTime;
-
     private MavenBuildProxy2 lastProxy;
 
-    
-
-    public Maven2Builder(BuildListener listener,Map<ModuleName,ProxyImpl2> proxies, Collection<MavenModule> modules, List<String> goals, Map<String,String> systemProps,  MavenBuildInformation mavenBuildInformation) {
-        super(listener,modules,goals,systemProps);
+    public Maven2Builder(BuildListener listener,Map<ModuleName,ProxyImpl2> proxies, Collection<MavenModule> modules, List<String> goals, 
+            Map<String,String> systemProps,  MavenBuildInformation mavenBuildInformation, String f) {
+        super(listener,modules,goals,systemProps,f,null);
         this.sourceProxies.putAll(proxies);
         this.proxies = new HashMap<ModuleName, FilterImpl>();
         for (Entry<ModuleName,ProxyImpl2> e : this.sourceProxies.entrySet()) {
