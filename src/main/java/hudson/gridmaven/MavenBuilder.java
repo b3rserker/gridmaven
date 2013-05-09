@@ -25,6 +25,7 @@
 package hudson.gridmaven;
 
 
+import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.Functions;
 import hudson.Launcher;
@@ -55,6 +56,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.text.NumberFormat;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -191,7 +193,8 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             String installCommand = "";
 
             // Untar
-            logger.println("Untaring...");
+            logger.println("Untaring sources for artifact: "+info.mArtifact 
+                    + "-" + info.mVersion + "." + info.mPackaging);
             try {
                 getAndUntar(fs, hdfsSource, buildPath);
             } catch (Exception fe) {
@@ -222,7 +225,8 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             }
 
             // Install artifacts
-            logger.println("Preinstalling artifacts:");
+            if (info.upStreamDeps.size()>0)
+                logger.println("Preinstalling artifacts:");
             for (UpStreamDep dep : info.upStreamDeps) {
 
                 // Fetch deps from hdfs repository
@@ -258,20 +262,22 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                 installCommand += info.mavenExePath + " " + s + ";";
             }
 
-            logger.println("Executing: " + installCommand);
+            //logger.println("Executing: " + installCommand);
             try {
                 if (!performWrapper(installCommand)) {
                     logger.println("Artifact installation failed!");
                 }
             } catch (Exception e) {
                 logger.println("Execute process of installing artifacts to local repository failed: "+installCommand);
+                //logger.println("If you have shared NFS repository...TODO: "+installCommand);
                 e.printStackTrace();
                 return Result.FAILURE;
             }
-            logger.println("Artifact installation finished.");
+            logger.println("Artifact installation finished\n");
 
             // ####### EOF Hadoop stuff, maven plugin continues
             
+            logger.println("Executing main goal");
             // Lauch MAIN maven process
             logger.println(formatArgs(goals));
             int r = Main.launch(goals.toArray(new String[goals.size()]));           
@@ -536,6 +542,8 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
     }
     public static final int BUFFER_MAX = 2048;
     
+    
+    // Methods from Shell.class, used for script that installs and packages artifacts
     public boolean performWrapper(String command) throws InterruptedException {
         FilePath ws = new FilePath(new File(buildPath));
 //        String command = "mkdir hello";
@@ -550,13 +558,17 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
         }
         int r;
         try {
-//            EnvVars envVars = new EnvVars();
-//            for (Map.Entry<String, String> e : info.entrySet) {
-//                envVars.put(e.getKey(), e.getValue());
-//            }
+            EnvVars envVars = new EnvVars();
+            
+            Iterator<Map.Entry<String, String>> entries = info.entrySet.entrySet().iterator();
+            while (entries.hasNext()) {
+                Map.Entry<String, String> entry = entries.next();
+                envVars.put(entry.getKey(), entry.getValue());
+            }
+            
             Launcher launcher = ws.createLauncher(listener);
             //r = launcher.launch().cmds("echo").envs(envVars).stdout(logger).pwd(ws).join();
-            r = launcher.launch().cmds(buildCommandLine(script, command)).stdout(listener).pwd(ws).join();
+            r = launcher.launch().cmds(buildCommandLine(script, command)).envs(envVars).stdout(listener).pwd(ws).join();
         } catch (IOException e) {
             Util.displayIOException(e, listener);
             e.printStackTrace(listener.fatalError(hudson.tasks.Messages.CommandInterpreter_CommandFailed()));

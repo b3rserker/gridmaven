@@ -41,6 +41,8 @@ import java.util.logging.Logger;
  *
  * @author Kohsuke Kawaguchi
  */
+
+//TODO label musi patrit pluginu
 @Extension
 public class ComputerListenerImpl extends ComputerListener {
     @Override

@@ -31,6 +31,9 @@ THE SOFTWARE.
     <f:entry title="${%Global MAVEN_OPTS}" help="/plugin/maven-plugin/maven-opts.html">
       <f:expandableTextbox name="globalMavenOpts" value="${descriptor.globalMavenOpts}" />
     </f:entry>
-    <f:dropdownDescriptorSelector title="${%Local Maven Repository}" field="localRepository" />
+    <f:entry title="Use nodes with following label">
+        <f:textbox name="gridJobsLabel" value="${descriptor.gridJobsLabel}" />
+    </f:entry>
+    <!--<f:dropdownDescriptorSelector title="${%Local Maven Repository}" field="localRepository" />-->
   </f:section>
 </j:jelly>

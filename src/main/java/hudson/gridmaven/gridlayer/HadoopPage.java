@@ -70,7 +70,7 @@ public class HadoopPage extends AbstractModelObject implements Action {
      */
     public URL getHdfsHttpURL() throws MalformedURLException {
         URL url = new URL(Hudson.getInstance().getRootUrl());
-        return new URL("http://"+url.getHost()+":"+PluginImpl.HTTP_PORT+"/");
+        return new URL("http://"+url.getHost()+":a"+PluginImpl.HTTP_PORT+"/");
     }
 
     public PluginImpl getPlugin() {

@@ -26,15 +26,20 @@ THE SOFTWARE.
   Config page.
 -->
 <?jelly escape-by-default='true'?>
-<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:i="jelly:fmt" xmlns:p="/lib/hudson/project">
-  <st:include page="configure-common.jelly" />
-
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" 
+         xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" 
+         xmlns:i="jelly:fmt" xmlns:p="/lib/hudson/project" xmlns:this="this">
+  <!--<st:include page="configure-common.jelly" />-->
+  <p:config-disableBuild/>
+  <!--<p:config-concurrentBuild />-->
+  <this:configure-scm/>
+  
   <p:config-trigger>
     <!-- setting to ignore upstream changes is done as a pseudo-trigger -->
-    <f:optionalBlock name="maven.triggerByDependency"
+<!--    <f:optionalBlock name="maven.triggerByDependency"
         help="/plugin/maven-plugin/ignore-upstrem-changes.html"
         title="${%Build whenever a SNAPSHOT dependency is built}"
-        checked="${h.defaultToTrue(!it.ignoreUpstremChanges())}" />
+        checked="${h.defaultToTrue(!it.ignoreUpstremChanges())}" />-->
     <p:config-upstream-pseudo-trigger />
   </p:config-trigger>
 
@@ -60,7 +65,7 @@ THE SOFTWARE.
     </j:if>
     <j:if test="${mavens.size() gt 1}">
       <!-- choice not necessary if there's no choice -->
-      <f:entry title="${%Maven Version}">
+      <f:entry title="Maven 2 Version">
         <select class="setting-input" name="maven_version">
           <j:forEach var="inst" items="${mavens}">
             <f:option selected="${inst.name==it.maven.name}">${inst.name}</f:option>
@@ -86,7 +91,7 @@ THE SOFTWARE.
                    checkUrl="'checkFileRelative?value='+escape(this.value)"
                    />
       </f:entry>
-      <f:optionalBlock name="maven.incrementalBuild"
+<!--      <f:optionalBlock name="maven.incrementalBuild"
                        title="${%Incremental build - only build changed modules}"
                        help="/plugin/maven-plugin/incremental.html"
                        checked="${it.isIncrementalBuild()}" />
@@ -99,16 +104,16 @@ THE SOFTWARE.
       <f:optionalBlock name="maven.usePrivateRepository" title="${%Use private Maven repository}" help="/plugin/maven-plugin/private-repository.html"
                        checked="${it.getExplicitLocalRepository()!=null}" inline="true">
         <f:dropdownDescriptorSelector title="${%Strategy}" field="explicitLocalRepository" />
-      </f:optionalBlock>
+      </f:optionalBlock>-->
       <f:optionalBlock name="maven.perModuleEmail" title="${%Send e-mail for each failed module}" help="/plugin/maven-plugin/per-module-email.html"
         checked="${it.isPerModuleEmail()}" />
-      <f:optionalBlock name="maven.resolveDependencies" title="${%Resolve Dependencies during Pom parsing}" 
+<!--      <f:optionalBlock name="maven.resolveDependencies" title="${%Resolve Dependencies during Pom parsing}" 
         checked="${it.isResolveDependencies()}" /> 
       <f:optionalBlock name="maven.runHeadless" title="${%Run Headless}" help="/plugin/maven-plugin/run-headless.html"
         checked="${it.runHeadless()}" />
       <f:optionalBlock name="maven.processPlugins" title="${%Process Plugins during Pom parsing}"
         checked="${it.isProcessPlugins()}" />
-      <p:config-customWorkspace />
+      <p:config-customWorkspace />-->
         
       <j:set var="mavenValidationLevels" value="${it.descriptor.mavenValidationLevels}" />   
       <f:entry title="${%Maven Validation Level}">
@@ -166,6 +171,6 @@ THE SOFTWARE.
   </j:if>
 
 
-  <p:config-buildWrappers />
+  <!--<p:config-buildWrappers />-->
   <p:config-publishers2 />
 </j:jelly>

@@ -410,17 +410,17 @@ public class MavenModule extends AbstractMavenProject<MavenModule,MavenBuild> im
         return modules;
     }
 
-    /**
-     * {@link MavenModule} uses the workspace of the {@link MavenModuleSet},
-     * so it always needs to be built on the same slave as the parent.
-     */
-    @Override
-    public Label getAssignedLabel() {
+//    /**
+//     * {@link MavenModule} uses the workspace of the {@link MavenModuleSet},
+//     * so it always needs to be built on the same slave as the parent.
+//     */
+//    @Override
+//    public Label getAssignedLabel() {
 //        Node n = getParent().getLastBuiltOn();
 //        if(n==null) return null;
 //        return n.getSelfLabel();
-        return null;
-    }
+//        return null;
+//    }
 
     /**
      * Workspace of a {@link MavenModule} is a part of the parent's workspace.

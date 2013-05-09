@@ -526,7 +526,8 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
     }
 
     public void setIgnoreUpstremChanges(boolean ignoreUpstremChanges) {
-        this.ignoreUpstremChanges = ignoreUpstremChanges;
+        //this.ignoreUpstremChanges = ignoreUpstremChanges;
+        this.ignoreUpstremChanges = false;
     }
 
     public void setRunHeadless(boolean runHeadless) {
@@ -963,6 +964,16 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
         }
     }
 
+    // TODO
+    public String getGridLabel() {
+        String gridLabel = DESCRIPTOR.getGridJobsLabel();
+        if (gridLabel != null) {
+            return gridLabel.replaceAll("[\t\r\n]+", " ");
+        } else {
+            return gridLabel;
+        }
+    }
+    
     /**
      * @since 1.426
      * @return
@@ -1070,7 +1081,7 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
         else
             localRepository = null;
         perModuleEmail = req.hasParameter("maven.perModuleEmail");
-        ignoreUpstremChanges = !json.has("triggerByDependency");
+        //ignoreUpstremChanges = !json.has("triggerByDependency");
         runHeadless = req.hasParameter("maven.runHeadless");
         incrementalBuild = req.hasParameter("maven.incrementalBuild");
         archivingDisabled = req.hasParameter("maven.archivingDisabled");
@@ -1145,6 +1156,7 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
          * Globally-defined MAVEN_OPTS.
          */
         private String globalMavenOpts;
+        private String gridJobsLabel;
         
         /**
          * @since 1.394
@@ -1155,6 +1167,7 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
          * @since 1.448
          */
         private LocalRepositoryLocator localRepository = new DefaultLocalRepositoryLocator();
+        
 
         public DescriptorImpl() {
             super();
@@ -1171,6 +1184,10 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
             return globalMavenOpts;
         }
 
+        public String getGridJobsLabel() {
+            return gridJobsLabel;
+        }        
+        
         public void setGlobalMavenOpts(String globalMavenOpts) {
             this.globalMavenOpts = globalMavenOpts;
             save();
@@ -1211,6 +1228,7 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
         @Override
         public boolean configure( StaplerRequest req, JSONObject o ) {
             globalMavenOpts = Util.fixEmptyAndTrim(o.getString("globalMavenOpts"));
+            gridJobsLabel = Util.fixEmptyAndTrim(o.getString("gridJobsLabel"));
             localRepository = req.bindJSON(LocalRepositoryLocator.class,o.getJSONObject("localRepository"));
             save();
 

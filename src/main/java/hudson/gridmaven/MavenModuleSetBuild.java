@@ -56,6 +56,7 @@ import hudson.model.Computer;
 import hudson.model.DependencyGraph;
 import hudson.model.Executor;
 import hudson.model.Fingerprint;
+import hudson.model.Label;
 import hudson.model.Node;
 import hudson.model.ParameterDefinition;
 import hudson.model.ParametersDefinitionProperty;
@@ -63,6 +64,7 @@ import hudson.model.Result;
 import hudson.model.Run;
 import hudson.model.StringParameterDefinition;
 import hudson.model.TaskListener;
+import hudson.model.labels.LabelAtom;
 import hudson.remoting.VirtualChannel;
 import hudson.scm.ChangeLogSet;
 import hudson.tasks.BuildStep;
@@ -590,10 +592,37 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                 String mavenVersion = mavenInformation.getVersion();
                 
                 MavenBuildInformation mavenBuildInformation = new MavenBuildInformation( mavenVersion );
+                
+                boolean maven3orLater = MavenUtil.maven3orLater(mavenVersion);
 
                 if(!build(listener,project.getPrebuilders().toList())){
                         r = FAILURE;
                     return r;
+                }
+                
+                if (maven3orLater) {
+                    // FIXME here for maven 3 builds
+                    listener.getLogger().println("Sorry, Maven3 is not supported yet!");
+                    return Result.ABORTED;
+                }
+                
+                String gridLabel = project.getGridLabel();
+                
+                // Test, if there some label exists
+                if (gridLabel == null) {
+                    logger.println("No label assigned for grid maven jobs! Please set label in global config first.");
+                    return FAILURE;
+                }
+
+                boolean nodeFound = false;
+                for (Node n : Jenkins.getInstance().getNodes()) {
+                    nodeFound = (n.getLabelString().equals(gridLabel)) ? true : false;
+                }
+                
+                // Test if some node have assigned label
+                if (!nodeFound) {
+                    logger.println("Cannot find any node with label assigned to grid maven projects! Try node configuration page.");
+                    return FAILURE;
                 }
                 
                 setMavenVersionUsed( mavenVersion );
@@ -611,9 +640,6 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                 MavenModule root = project.getRootModule(); 
                 hadoop.listFiles("/",logger);
                 
-                //root.setAssignedNode(nodes);
-                root.scheduleBuild(new UpstreamCause((Run<?,?>)MavenModuleSetBuild.this));
-                
                 // Schedule build of dependencies
                 final DependencyGraph graph = Jenkins.getInstance().getDependencyGraph();
                 List<DependencyGraph.Dependency> downstreamProjects = new ArrayList
@@ -625,8 +651,8 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                         // Swapping lhs/rhs to get reverse sort:
                         return graph.compare(rhs.getDownstreamProject(), lhs.getDownstreamProject());
                     }
-                });
-
+                });          
+                
                 String jobName = project.getName();
                 String rootArtifact = root.getModuleName().artifactId;
                 String rootGroupId = root.getModuleName().groupId;
@@ -656,6 +682,8 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                 
                 for (DependencyGraph.Dependency dep : downstreamProjects) {
                     AbstractProject p = dep.getDownstreamProject();
+                    LabelAtom label = Jenkins.getInstance().getLabelAtom(project.getGridLabel());
+                    p.setAssignedLabel(label);
                     if (p.isDisabled()) {
                         logger.println(hudson.tasks.Messages.
                                 BuildTrigger_Disabled(ModelHyperlinkNote.encodeTo(p)));
@@ -677,12 +705,12 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                         }
                         String aProjectName = p.getName();
                         p.setBlockBuildWhenUpstreamBuilding(true);
-                        if(p.scheduleBuild(p.getQuietPeriod(), new UpstreamCause((Run)this.getBuild()),
-                                           buildActions.toArray(new Action[buildActions.size()]))) {
-                            logger.println(hudson.tasks.Messages.BuildTrigger_Triggering(name));
-                        } else {
-                            logger.println(hudson.tasks.Messages.BuildTrigger_InQueue(name));
-                        }
+//                        if(p.scheduleBuild(p.getQuietPeriod(), new UpstreamCause((Run)this.getBuild()),
+//                                           buildActions.toArray(new Action[buildActions.size()]))) {
+//                            logger.println(hudson.tasks.Messages.BuildTrigger_Triggering(name));
+//                        } else {
+//                            logger.println(hudson.tasks.Messages.BuildTrigger_InQueue(name));
+//                        }
                 }
                 return r;
             }catch (AbortException e) {
@@ -885,7 +913,20 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
             // too late to set the build result at this point. so ignore failures.
             performAllBuildSteps(listener, project.getPublishers(), false);
             performAllBuildSteps(listener, project.getProperties(), false);
-            //super.cleanUp(listener);
+            
+            // Trigger downstream job - in this case root module
+            if (!getResult().isWorseThan(Result.SUCCESS)){
+                MavenModule root = project.getRootModule();
+                String name = ModelHyperlinkNote.encodeTo(root)+" #"+root.getNextBuildNumber();
+                if(root.scheduleBuild(new UpstreamCause((Run<?,?>)MavenModuleSetBuild.this))) {
+                    listener.getLogger().println(hudson.tasks.Messages.BuildTrigger_Triggering(name));
+                } else {
+                    listener.getLogger().println(hudson.tasks.Messages.BuildTrigger_InQueue(name));
+                }
+                
+            }
+            
+            super.cleanUp(listener);
             buildEnvironments = null;
         }
 

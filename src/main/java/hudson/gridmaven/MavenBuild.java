@@ -38,6 +38,8 @@ import hudson.maven.agent.AbortException;
 import hudson.model.AbstractBuild;
 import hudson.model.AbstractProject;
 import hudson.model.BuildListener;
+import hudson.model.Cause;
+import hudson.model.Cause.UserIdCause;
 import hudson.model.Computer;
 import hudson.model.Descriptor;
 import hudson.model.Environment;
@@ -82,13 +84,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.logging.Logger;
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+
 
 /**
  * {@link Run} for {@link MavenModule}.
@@ -717,7 +714,14 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
 
 
             boolean maven3orLater = MavenUtil.maven3orLater(mavenVersion);
-
+            
+            if (maven3orLater)
+            { 
+                // FIXME here for maven 3 builds
+                listener.getLogger().println("Building single Maven modules is not implemented for Maven 3, yet!");
+                return Result.ABORTED;
+            }
+            
             ProcessCache.MavenProcess process = MavenBuild.mavenProcessCache.get(launcher.getChannel(), listener, maven3orLater
                     ? new Maven3ProcessFactory(
                     getParent().getParent(), launcher, envVars, getMavenOpts(listener, envVars), null)
@@ -763,13 +767,6 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
             // backward compatibility
             systemProps.put("hudson.build.number", String.valueOf(getNumber()));
             String rel = project.getRelativePath();
-            
-            if (maven3orLater)
-            { 
-                // FIXME here for maven 3 builds
-                listener.getLogger().println("Building single Maven modules is not implemented for Maven 3, yet!");
-                return Result.ABORTED;
-            }
 
             PluginImpl pl = PluginImpl.get();
             
@@ -795,9 +792,19 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
             Node node = getCurrentNode();
             FilePath rootPath = node.getWorkspaceFor(project.getParent());
             String workspace = rootPath.child(getProject().getRelativePath()).getRemote();
-            //serialInfo.entrySet = (Map.Entry<String, String>) getBuildVariables().entrySet();
-            //serialInfo.entrySet = getBuildVariables().entrySet();
-//            
+            serialInfo.entrySet = new HashMap<String, String>();
+            for (Map.Entry<String, String> e : getBuildVariables().entrySet()) {
+                if ("".equals(e.getKey())) {
+                    continue;
+                }
+                if (e.getValue() == null) {
+                    throw new IllegalArgumentException("Global Environment Variable " + e.getKey() + " has a null value");
+                }
+                System.getProperties().put(e.getKey(), e.getValue());
+                serialInfo.entrySet.put(e.getKey(), e.getValue());
+            }
+            
+//            getCauses();
 //            String artifact = project.getModuleName().artifactId;
 //            String version = project.getVersion();
 //            String packaging = project.getPackaging();
@@ -934,6 +941,18 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
 
         @Override
         public void cleanUp(BuildListener listener) throws Exception {
+            boolean isUserBuild = false;
+            
+            for (Cause c : getCauses()) {
+                if (c.getClass() == hudson.model.Cause.UserIdCause.class)
+                    isUserBuild = true;
+            }
+            
+            // Trigger downstream builds
+            if (!isUserBuild){
+                super.cleanUp(listener);
+            }
+            
             buildEnvironments = null;
         }
 

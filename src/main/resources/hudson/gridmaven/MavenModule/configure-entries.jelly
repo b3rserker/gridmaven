@@ -28,7 +28,15 @@ THE SOFTWARE.
 <?jelly escape-by-default='true'?>
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:p="/lib/hudson/project">
   <p:config-trigger />
-
+<!-- master/slave -->
+  <j:if test="${app.labels.size() gt 1 || app.clouds.size() gt 0 || (it.assignedLabel!=null and it.assignedLabel!=app.selfLabel)}">
+    <f:optionalBlock name="hasSlaveAffinity" title="${%Restrict where this project can be run}" checked="${it.assignedLabel!=null}"
+        help="/help/project-config/slave.html">
+      <f:entry title="Override label" field="assignedLabelString">
+        <f:textbox autoCompleteDelimChar=" "/>
+      </f:entry>
+    </f:optionalBlock>
+  </j:if>
   <f:section title="${%Build}">
     <f:entry title="${%Goals}" help="/plugin/maven-plugin/module-goals.html">
       <f:textbox name="goals" value="${it.userConfiguredGoals}"/>

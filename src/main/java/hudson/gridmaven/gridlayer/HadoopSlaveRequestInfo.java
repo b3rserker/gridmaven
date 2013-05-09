@@ -48,7 +48,7 @@ public class HadoopSlaveRequestInfo implements Serializable{
     public String rVersion;
     public String rName;
     public String jobName;    
-    //public Set<Map.Entry<String, String>> entrySet;
+    public Map<String, String> entrySet;
     public List<UpStreamDep> upStreamDeps = new ArrayList<UpStreamDep>();
     public String mavenExePath;
     
