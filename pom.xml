@@ -441,14 +441,28 @@ THE SOFTWARE.
           </execution>
         </executions>
       </plugin>
-      <plugin><!-- generate licenses.xml -->
+
+      <plugin>
         <groupId>com.cloudbees</groupId>
         <artifactId>maven-license-plugin</artifactId>
         <!-- version specified in grandparent pom -->
         <configuration>
           <generateLicenseXml>target/${project.artifactId}/WEB-INF/licenses.xml</generateLicenseXml>
         </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>process</goal>
+              </goals>
+              <phase>compile</phase>
+              <configuration>
+                <requireCompleteLicenseInfo>true</requireCompleteLicenseInfo>
+                <script>./licenseCompleter.groovy</script>
+              </configuration>
+            </execution>
+          </executions>
       </plugin>
+
       <plugin>
         <artifactId>maven-dependency-plugin</artifactId>
         <executions>
