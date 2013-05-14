@@ -29,7 +29,7 @@ THE SOFTWARE.
   <parent>
     <groupId>org.jenkins-ci.main</groupId>
     <artifactId>pom</artifactId>
-    <version>1.481</version>
+    <version>1.490</version>
   </parent>
 
   <artifactId>maven-grid-plugin</artifactId>
@@ -78,7 +78,7 @@ THE SOFTWARE.
   <groupId>org.jenkins-ci.main</groupId>
   <artifactId>jenkins-war</artifactId>
   <type>war</type>
-  <version>1.481</version>
+  <version>1.490</version>
   <scope>test</scope>
 </dependency>
     
@@ -538,7 +538,27 @@ THE SOFTWARE.
   </build>
 
   <profiles>
-    
+   
+    <!-- Give access to Jenkins plugins -->
+    <profile>
+      <id>jenkins</id>
+      <activation>
+        <activeByDefault>true</activeByDefault> <!-- change this to false, if you don't like to have it on per default -->
+      </activation>
+      <repositories>
+        <repository>
+          <id>repo.jenkins-ci.org</id>
+          <url>http://repo.jenkins-ci.org/public/</url>
+        </repository>
+      </repositories>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>repo.jenkins-ci.org</id>
+          <url>http://repo.jenkins-ci.org/public/</url>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+ 
   <profile>
     <id>cobertura2</id>
     <build>

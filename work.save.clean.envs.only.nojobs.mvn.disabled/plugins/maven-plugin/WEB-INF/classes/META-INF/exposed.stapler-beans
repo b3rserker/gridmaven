@@ -1,9 +1,0 @@
-hudson.maven.MavenBuild
-hudson.maven.MavenModule
-hudson.maven.MavenModuleSet
-hudson.maven.MavenModuleSetBuild
-hudson.gridmaven.reporters.MavenAbstractArtifactRecord
-hudson.gridmaven.reporters.MavenAbstractArtifactRecord.Record
-hudson.gridmaven.reporters.MavenAggregatedArtifactRecord
-hudson.gridmaven.reporters.MavenArtifact
-hudson.gridmaven.reporters.MavenArtifactRecord
