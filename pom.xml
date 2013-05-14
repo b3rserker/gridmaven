@@ -489,6 +489,8 @@ THE SOFTWARE.
           </execution>
         </executions>
       </plugin>
+
+<!-- Jrebel devel framework
 	<plugin>
                 <groupId>org.zeroturnaround</groupId>
                 <artifactId>jrebel-maven-plugin</artifactId>
@@ -506,7 +508,7 @@ THE SOFTWARE.
                     </execution>
                 </executions>
             </plugin>
-    
+-->
 
       <plugin>
         <!-- put hadoop distribution in as a resource -->
