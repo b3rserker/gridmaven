@@ -73,10 +73,10 @@ class NameNodeStartTask implements Callable<Void,IOException> {
         conf.set("dfs.safemode.extension", "1");
         //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-default.xml"));
         //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-site.xml"));
-        if(format) {
+//        if(format) {
             System.out.println("Formatting HDFS");
             NameNode.format(conf);
-        }
+//        }
 
         System.out.println("Starting namenode");
         NameNode.createNameNode(new String[0], conf);

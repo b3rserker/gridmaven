@@ -526,6 +526,10 @@ THE SOFTWARE.
               <tasks>
                 <property name="dest" value="${project.basedir}/target/classes/hudson/gridmaven/gridlayer/" />
                 <mkdir dir="${dest}" />
+
+<delete>
+   <fileset dir="./work/hadoop"/>
+</delete>
                 <resolveArtifact groupId="org.jvnet.hudson.hadoop" artifactId="hadoop-core" version="${hadoop.version}" classifier="mini-bin" type="tar.gz" tofile="${dest}/hadoop.tar.gz" />
                 <!-- checksum used for up-to-date check -->
                 <checksum file="${dest}/hadoop.tar.gz" />
