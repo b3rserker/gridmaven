@@ -317,24 +317,52 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
 
             // Insert compiled artifact to hdfs repository
             String absolute = buildPath;
-            String relative = absolute.substring(absolute.lastIndexOf('/'), absolute.length());
-            Path absArtifactPath = new Path(absolute + "/target/" + artifact + "-" + version + "." + packaging);
+            //String relative = absolute.substring(absolute.lastIndexOf('/'), absolute.length());
+            String artPath = absolute + "/target/" + artifact + "-" + version + "." + packaging;
+            File normalPom = new File(artPath);
+            if (!normalPom.exists()){
+                artPath = absolute + "/target/" + artifact + "." + "jar";
+                File specialJar = new File(artPath);
+                if (!specialJar.exists()){
+                    artPath = absolute + "/target/" + artifact + "-tests." + "jar";
+                    File specialTestJar = new File(artPath);
+                    if (!specialTestJar.exists()){
+                        artPath = "";
+                    }
+                }
+            }
+            
+            
             
             try {
-                if (upStreamDeps.size() > 0) {
+                // Copy produced archives
+                if (upStreamDeps.size() > 0 && !artPath.equals("")) {
+                    String destName = "/repository/" + artifact + "-" + version + "." + packaging;
+                    Path absArtifactPath = new Path(artPath);
                     logger.println("\nCopying from local path:"
-                            + absArtifactPath + " to hadoop: /repository/" + artifact + "-" + version + "." + packaging);
-                    fs.copyFromLocalFile(absArtifactPath, new Path("/repository"));
+                            + absArtifactPath + " to hadoop:" +destName);
+                    fs.copyFromLocalFile(absArtifactPath, new Path(destName));
+                
+                // Copy only parent pom
                 } else {
                     Path pomPath = new Path(absolute + "/pom.xml");
                     logger.println("\nCopying from local path:" + pomPath
                             + " to hadoop: /repository/" + artifact + "-" + version + "." + packaging);
-                    fs.copyFromLocalFile(pomPath, new Path("/repository/" + artifact + "-" + version + "." + packaging));
+                    String name = "/repository/" + artifact + "-" + version + "." + packaging;
+                    
+                    Path nameP = new Path(name);
+                    FileStatus[] status2 = fs.listStatus(nameP);
+                    if (status2 == null) 
+                        try{
+                        fs.copyFromLocalFile(pomPath, new Path(name));
+                        }catch (Exception e){
+                            logger.println("Exception");
+                        }
                 }
             } catch (Exception e) {
-                logger.println("Failed to insert packaged artifact to hdfs repository!");
-                e.printStackTrace();
-                return Result.FAILURE;
+                logger.println("Failed to insert packaged artifact to hdfs repository! Maybe artifact only exists and this is not error.");
+                //e.printStackTrace();
+                //return Result.FAILURE;
             }
             
             logger.println("Inserting to hadoop finished"); 

@@ -616,7 +616,9 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
 
                 boolean nodeFound = false;
                 for (Node n : Jenkins.getInstance().getNodes()) {
-                    nodeFound = (n.getLabelString().equals(gridLabel)) ? true : false;
+                    //nodeFound = (n.getLabelString().equals(gridLabel)) ? true : false;
+                    if (n.getLabelString().equals(gridLabel))
+                        nodeFound = true;
                 }
                 
                 // Test if some node have assigned label
@@ -659,7 +661,18 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                 String rootVersion = root.getVersion();
                 String rootName = rootGroupId +"."+ rootArtifact +"-"+ rootVersion;
 
-                for (MavenModule m : project.sortedActiveModules) {
+                
+                logger.println("Global module count: " + project.getModules().size()+"\n");
+                logger.println("Active sorted module count: " + project.sortedActiveModules.size()+"\n");
+                logger.println("Disabled module count: " + project.getDisabledModules(false).size()+"\n");
+                
+                for (MavenModule m : project.getModules()) {
+                    logger.println("Global found module: " + m.getName());
+                }
+                
+                
+                
+                for (MavenModule m : project.getModules()) {
                     String modulePath = getWorkspace() + File.separator + m.getRelativePath();
                     String artifact = m.getModuleName().artifactId;
                     String version = m.getVersion();

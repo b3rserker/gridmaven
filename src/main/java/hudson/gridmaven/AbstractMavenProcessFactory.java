@@ -311,8 +311,8 @@ public abstract class AbstractMavenProcessFactory
         }
 
         // Add Hadoop jar eventually
-        args.add(getHadoopJar(mvn,isMaster,slaveRoot));
-        args.add(getCompressJar(mvn,isMaster,slaveRoot));
+        //args.add(getHadoopJar(mvn,isMaster,slaveRoot));
+        //args.add(getCompressJar(mvn,isMaster,slaveRoot));
         
         return args;
     }

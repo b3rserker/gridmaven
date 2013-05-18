@@ -18,7 +18,7 @@ complete {
     // Apache components
     //   logkit is a part of Avalon
     
-match(["org.apache.ant:*","commons-jelly:*","log4j:*","avalon-framework:*","logkit:logkit","oro:oro","commons-codec:*","commons-beanutils:*","commons-net:*","commons-cli:*","*:commons-jelly","org.jvnet.hudson:commons-jelly-tags-define","slide:slide-webdavlib","org.jvnet.hudson.hadoop:*"]) 
+match(["org.apache.ant:*","commons-jelly:*","log4j:*","avalon-framework:*","logkit:logkit","oro:oro","commons-codec:*","commons-beanutils:*","commons-net:*","commons-cli:*","*:commons-jelly","org.jvnet.hudson:commons-jelly-tags-define","slide:slide-webdavlib","org.jvnet.hudson.hadoop:*","org.apache.commons:commons-compress"]) 
 {
         if (dependency.licenses.isEmpty())
             rewriteLicense([], apacheLicense)
