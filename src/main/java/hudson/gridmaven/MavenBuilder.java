@@ -240,11 +240,13 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                 logger.println("Copying from hadoop path: " + hdfsPath + " to local path:" + absPath);
                 try {
                     FileStatus[] statusP = fs.listStatus(hdfsPath);
-                    for (int i = 0; i < statusP.length; i++) {
-                        if (!statusP[i].isDir())
-                            fs.copyToLocalFile(statusP[i].getPath(), absPath);
+                    if (statusP == null)
+                        throw new IOException2("This irtifact is not in hdfs repository!", null);
+                    for (FileStatus file : statusP) {
+                        if (!file.isDir())
+                            fs.copyToLocalFile(file.getPath(), absPath);
                     }
-                } catch (IOException e) {
+                } catch (Exception e) {
                     logger.println("Prerequisite artifact needed for module build missing: " + artifactName);
                     return Result.FAILURE;
                 }
@@ -320,60 +322,60 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             // Insert compiled artifact to hdfs repository
             String absolute = buildPath;
 //            String relative = absolute.substring(absolute.lastIndexOf('/'), absolute.length());
-//            String artPath = absolute + "/target/" + artifact + "-" + version + "." + packaging;
-//            File normalPom = new File(artPath);
-//            if (!normalPom.exists()){
-//                artPath = absolute + "/target/" + artifact + "." + "jar";
-//                File specialJar = new File(artPath);
-//                if (!specialJar.exists()){
-//                    artPath = absolute + "/target/" + artifact + "-tests." + "jar";
-//                    File specialTestJar = new File(artPath);
-//                    if (!specialTestJar.exists()){
-//                        artPath = "";
-//                    }
-//                }
-//            }
+            String artPath = absolute + "/target/" + artifact + "-" + version + "." + packaging;
+            File normalPom = new File(artPath);
+            // If its bundle!
+            if (!normalPom.exists()){
+                artPath = absolute + "/target/" + artifact + "." + "jar";
+                File specialJar = new File(artPath);
+                if (!specialJar.exists()){   
+                        artPath = "";
+                        packaging = "jar";
+                }
+            }
 
 
             try {
                 // Copy produced archives
                 //if (upStreamDeps.size() > 0 && !artPath.equals("")) {
-                String artPath;
+                // String artPath;
                 // If theres no file in target folder
-                boolean somethingFound = false;
+                //boolean somethingFound = false;
                 
-                if (upStreamDeps.size() > 0) {
-                    String destName;// = "/repository/" + artifact + "-" + version + "/" + artifact + "-" + version + "." + packaging;
-
+                if (upStreamDeps.size() > 0 && !artPath.equals("")) {
+                    String destName;
                     File target = new File(absolute + File.separator + "target");
                     logger.println("Produced artifacts found:");
                     File[] files = target.listFiles();
                     
-                    
-                    for (File file : files) {
-                        if (file.isFile()) {
-                            logger.println(file.getPath());
-                            artPath = file.getAbsolutePath();
-                            if (artPath.contains("pom") || artPath.contains("jar") || artPath.contains("war") || artPath.contains("ear")) {
-                                String suffix = artPath.substring(artPath.lastIndexOf('.')+1, artPath.length());
-                                Path absArtifactPath = new Path(artPath);
-//                                if (!suffix.equals(packaging)){
-                                destName = "/repository/" + artifact + "-" + version + "/" + artifact + "-" + version + "." + suffix;
+                    if (target.length() > 0) {
+//                        for (File file : files) {
+//                            if (file.isFile()) {
+//                                logger.println(file.getPath());
+//                                artPath = file.getAbsolutePath();
+//                                if (artPath.contains("pom") || artPath.contains("jar") || artPath.contains("war") || artPath.contains("ear")) {
+//                                    String suffix = artPath.substring(artPath.lastIndexOf('.') + 1, artPath.length());
+                                    Path absArtifactPath = new Path(artPath);
+                                    destName = "/repository/" + artifact + "-" + version + "/" + artifact + "-" + version + "." + packaging;
+
+                                    Path nameP = new Path(artPath);
+                                    FileStatus[] status3 = fs.listStatus(nameP);
+                                    if (status3 == null) {
+                                        logger.println("\nCopying from local path:" + absArtifactPath + " to hadoop:" + destName);
+                                        try {
+                                            fs.copyFromLocalFile(absArtifactPath, new Path(destName));
+                                        } catch (Exception e) {
+                                            logger.println("Exception in inserting artifact!");
+                                            return Result.FAILURE;
+                                        }
+                                    }
 //                                }
-                                
-                                Path nameP = new Path(artPath);
-                                FileStatus[] status3 = fs.listStatus(nameP);
-                                if (status3 == null) {
-                                    
-                                    logger.println("\nCopying from local path:" + absArtifactPath + " to hadoop:" + destName);
-                                    fs.copyFromLocalFile(absArtifactPath, new Path(destName));
-                                }
-                            }
-                        }
+//                            }
+//                        }
                     }
                 }
+                
                 // Copy only parent pom or archive at least main pom
-                //if (upStreamDeps.size() <= 0 || !somethingFound){
                 Path pomPath = new Path(absolute + "/pom.xml");
                 logger.println("\nCopying from local path:" + pomPath
                         + " to hadoop: /repository/" + artifact + "-" + version + ".pom");
@@ -385,14 +387,14 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                     try {
                         fs.copyFromLocalFile(pomPath, new Path(name));
                     } catch (Exception e) {
-                        logger.println("Exception");
+                        logger.println("Exception in inserting main pom artifact!");
                     }
                 }
                 //}
             } catch (Exception e) {
                 logger.println("Failed to insert packaged artifact to hdfs repository! Maybe artifact only exists and this is not error.");
-                //e.printStackTrace();
-                //return Result.FAILURE;
+                e.printStackTrace();
+                return Result.FAILURE;
             }
 
             logger.println("Inserting to hadoop finished");

@@ -71,8 +71,7 @@ class NameNodeStartTask implements Callable<Void,IOException> {
 
         conf.setInt("dfs.replication",1);
         conf.set("dfs.safemode.extension", "1");
-        //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-default.xml"));
-        //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-site.xml"));
+        conf.set("dfs.block.size","1048576");
         //if(format) {
             System.out.println("Formatting HDFS");
             NameNode.format(conf);

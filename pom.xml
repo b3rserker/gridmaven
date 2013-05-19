@@ -534,7 +534,6 @@ THE SOFTWARE.
 	</executions>
       </plugin>
       <plugin>
-        <!-- put hadoop distribution in as a resource -->
         <groupId>org.jvnet.maven-antrun-extended-plugin</groupId>
         <artifactId>maven-antrun-extended-plugin</artifactId>
         <version>1.38</version>
@@ -548,19 +547,13 @@ THE SOFTWARE.
               <verifyArtifact>false</verifyArtifact>
               <tasks>
 		<delete dir="./work/hadoop"/>
- 
-<!--		<delete>
-                    <fileset dir="./work/hadoop">
-                    </fileset>
-                </delete>
--->
-	      </tasks>
+ 	      </tasks>
             </configuration>
           </execution>
         </executions>
       </plugin>
+
 </plugins>
-    
     
   </build>
 
