@@ -24,7 +24,6 @@
  */
 package hudson.gridmaven;
 
-
 import hudson.EnvVars;
 import hudson.FilePath;
 import hudson.Functions;
@@ -89,22 +88,20 @@ import org.codehaus.plexus.configuration.PlexusConfiguration;
  * As a callable, this function returns the build result.
  *
  * <p>
- * This class defines a series of event callbacks, which are invoked during the build.
- * This allows subclass to monitor the progress of a build.
+ * This class defines a series of event callbacks, which are invoked during the
+ * build. This allows subclass to monitor the progress of a build.
  *
  * @author Kohsuke Kawaguchi
  * @since 1.133
  */
 @SuppressWarnings("deprecation") // as we're restricted to Maven 2.x API here, but compile against Maven 3.x we cannot avoid deprecations
-public abstract class MavenBuilder extends AbstractMavenBuilder implements DelegatingCallable<Result,IOException> {
-
+public abstract class MavenBuilder extends AbstractMavenBuilder implements DelegatingCallable<Result, IOException> {
 
     /**
-     * Flag needs to be set at the constructor, so that this reflects
-     * the setting at master.
+     * Flag needs to be set at the constructor, so that this reflects the
+     * setting at master.
      */
     private final boolean profile = MavenProcessFactory.profile;
-    
     // Hadoop builpath of this specific module
     private final String buildPath;
     private final HadoopSlaveRequestInfo info;
@@ -112,7 +109,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
 
     protected MavenBuilder(BuildListener listener, Collection<MavenModule> modules,
             List<String> goals, Map<String, String> systemProps, String buildPath, HadoopSlaveRequestInfo hadoopData) {
-        super( listener, modules, goals, systemProps);
+        super(listener, modules, goals, systemProps);
         this.buildPath = buildPath;
         this.info = hadoopData;
     }
@@ -151,32 +148,31 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
      * Called after a {@link MavenReport} is successfully generated.
      */
     abstract void onReportGenerated(MavenProject project, MavenReportInfo report) throws IOException, InterruptedException, AbortException;
-
     private Class<?> pluginManagerInterceptorClazz;
     private Class[] pluginManagerInterceptorListenerClazz;
     private Class<?> lifecycleInterceptorClazz;
     private Class[] lifecycleInterceptorListenerClazz;
-    
+
     /**
      * This code is executed inside the maven jail process.
      */
     public Result call() throws IOException {
-        
+
         // hold a ref on correct classloader for finally call as something is changing tccl 
         // and not restore it !
-        ClassLoader mavenJailProcessClassLoader = Thread.currentThread().getContextClassLoader();        
-        
+        ClassLoader mavenJailProcessClassLoader = Thread.currentThread().getContextClassLoader();
+
         try {
             PrintStream logger = listener.getLogger();
             initializeAsynchronousExecutions();
             Adapter a = new Adapter(this);
-            callSetListenerWithReflectOnInterceptors( a, mavenJailProcessClassLoader );
-            
+            callSetListenerWithReflectOnInterceptors(a, mavenJailProcessClassLoader);
+
             /*
-            PluginManagerInterceptor.setListener(a);
-            LifecycleExecutorInterceptor.setListener(a);
-            */
-            
+             PluginManagerInterceptor.setListener(a);
+             LifecycleExecutorInterceptor.setListener(a);
+             */
+
             markAsSuccess = false;
 
             registerSystemProperties();
@@ -193,7 +189,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             String installCommand = "";
 
             // Untar
-            logger.println("Untaring sources for artifact: "+info.mArtifact 
+            logger.println("Untaring sources for artifact: " + info.mArtifact
                     + "-" + info.mVersion + "." + info.mPackaging);
             try {
                 getAndUntar(fs, hdfsSource, buildPath);
@@ -215,24 +211,24 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
 //                for (int i = 0; i < status.length; i++) {
 //                    logger.println("Reading file: " + status[i].getPath());
 //                }
-            }
-            else{
+            } else {
                 logger.println("Creating hdfs repository.");
-                if (!fs.mkdirs(repo)){
+                if (!fs.mkdirs(repo)) {
                     logger.println("Cannot create hdfs repository");
                     return Result.FAILURE;
                 }
             }
 
             // Install artifacts
-            if (info.upStreamDeps.size()>0)
+            if (info.upStreamDeps.size() > 0) {
                 logger.println("Preinstalling artifacts:");
+            }
             for (UpStreamDep dep : info.upStreamDeps) {
 
                 // Fetch deps from hdfs repository
                 String artifactName = dep.art + "-" + dep.ver
                         + "." + dep.pkg;
-                Path hdfsPath = new Path("/repository/" + artifactName);
+                Path hdfsPath = new Path("/repository/" + dep.art + "-" + dep.ver);
                 Path absPath = new Path(buildPath + "/deps");
 
                 boolean success = (new File(buildPath + "/deps")).mkdirs();
@@ -242,20 +238,24 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                 }
 
                 logger.println("Copying from hadoop path: " + hdfsPath + " to local path:" + absPath);
-                try{
-                    fs.copyToLocalFile(hdfsPath, absPath);
-                }
-                catch(IOException e){
-                    logger.println("Prerequisite artifact needed for module build missing: "+artifactName);
+                try {
+                    FileStatus[] statusP = fs.listStatus(hdfsPath);
+                    for (int i = 0; i < statusP.length; i++) {
+                        if (!statusP[i].isDir())
+                            fs.copyToLocalFile(statusP[i].getPath(), absPath);
+                    }
+                } catch (IOException e) {
+                    logger.println("Prerequisite artifact needed for module build missing: " + artifactName);
                     return Result.FAILURE;
                 }
                 //goals.add("package");
-                String s = "install:install-file -Dfile=./deps/"
+                String s = "install:install-file -Dfile=deps"+File.separator
                         + dep.art + "-" + dep.ver + "." + dep.pkg
                         + " -DgroupId=" + dep.group
                         + " -DartifactId=" + dep.art
                         + " -Dversion=" + dep.ver
-                        + " -Dpackaging=" + dep.pkg;
+                        + " -Dpackaging=" + dep.pkg
+                        + " -DpomFile=" + "deps" + File.separator + dep.art + "-" + dep.ver + ".pom";
                 logger.println("Preinstalling artifact: " + s + "\n");
                 //Shell b = new Shell(mvn.getExecutable(launcher) + s);
                 //b.perform(MavenBuild.this, launcher, listener);
@@ -268,7 +268,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                     logger.println("Artifact installation failed!");
                 }
             } catch (Exception e) {
-                logger.println("Execute process of installing artifacts to local repository failed: "+installCommand);
+                logger.println("Execute process of installing artifacts to local repository failed: " + installCommand);
                 //logger.println("If you have shared NFS repository...TODO: "+installCommand);
                 e.printStackTrace();
                 return Result.FAILURE;
@@ -276,33 +276,35 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             logger.println("Artifact installation finished\n");
 
             // ####### EOF Hadoop stuff, maven plugin continues
-            
+
             logger.println("Executing main goal");
             // Lauch MAIN maven process
             logger.println(formatArgs(goals));
-            int r = Main.launch(goals.toArray(new String[goals.size()]));           
-            
+            int r = Main.launch(goals.toArray(new String[goals.size()]));
+
             // now check the completion status of async ops
             long startTime = System.nanoTime();
-            
+
             Result waitForAsyncExecutionsResult = waitForAsynchronousExecutions();
             if (waitForAsyncExecutionsResult != null) {
                 return waitForAsyncExecutionsResult;
             }
-            
-            a.overheadTime += System.nanoTime()-startTime;
 
-            if(profile) {
+            a.overheadTime += System.nanoTime() - startTime;
+
+            if (profile) {
                 NumberFormat n = NumberFormat.getInstance();
-                logger.println("Total overhead was "+format(n,a.overheadTime)+"ms");
+                logger.println("Total overhead was " + format(n, a.overheadTime) + "ms");
                 Channel ch = Channel.current();
-                logger.println("Class loading "   +format(n,ch.classLoadingTime.get())   +"ms, "+ch.classLoadingCount+" classes");
-                logger.println("Resource loading "+format(n,ch.resourceLoadingTime.get())+"ms, "+ch.resourceLoadingCount+" times");                
+                logger.println("Class loading " + format(n, ch.classLoadingTime.get()) + "ms, " + ch.classLoadingCount + " classes");
+                logger.println("Resource loading " + format(n, ch.resourceLoadingTime.get()) + "ms, " + ch.resourceLoadingCount + " times");
             }
-            
+
             // Building successfully finished?
-            if(r!=0)    return Result.FAILURE;
-            
+            if (r != 0) {
+                return Result.FAILURE;
+            }
+
             // ####### Hadoop stuff
             // Package artifact
             logger.println("Packaging...");
@@ -317,60 +319,90 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
 
             // Insert compiled artifact to hdfs repository
             String absolute = buildPath;
-            //String relative = absolute.substring(absolute.lastIndexOf('/'), absolute.length());
-            String artPath = absolute + "/target/" + artifact + "-" + version + "." + packaging;
-            File normalPom = new File(artPath);
-            if (!normalPom.exists()){
-                artPath = absolute + "/target/" + artifact + "." + "jar";
-                File specialJar = new File(artPath);
-                if (!specialJar.exists()){
-                    artPath = absolute + "/target/" + artifact + "-tests." + "jar";
-                    File specialTestJar = new File(artPath);
-                    if (!specialTestJar.exists()){
-                        artPath = "";
-                    }
-                }
-            }
-            
-            
-            
+//            String relative = absolute.substring(absolute.lastIndexOf('/'), absolute.length());
+//            String artPath = absolute + "/target/" + artifact + "-" + version + "." + packaging;
+//            File normalPom = new File(artPath);
+//            if (!normalPom.exists()){
+//                artPath = absolute + "/target/" + artifact + "." + "jar";
+//                File specialJar = new File(artPath);
+//                if (!specialJar.exists()){
+//                    artPath = absolute + "/target/" + artifact + "-tests." + "jar";
+//                    File specialTestJar = new File(artPath);
+//                    if (!specialTestJar.exists()){
+//                        artPath = "";
+//                    }
+//                }
+//            }
+
+
             try {
                 // Copy produced archives
-                if (upStreamDeps.size() > 0 && !artPath.equals("")) {
-                    String destName = "/repository/" + artifact + "-" + version + "." + packaging;
-                    Path absArtifactPath = new Path(artPath);
-                    logger.println("\nCopying from local path:"
-                            + absArtifactPath + " to hadoop:" +destName);
-                    fs.copyFromLocalFile(absArtifactPath, new Path(destName));
+                //if (upStreamDeps.size() > 0 && !artPath.equals("")) {
+                String artPath;
+                // If theres no file in target folder
+                boolean somethingFound = false;
                 
-                // Copy only parent pom
-                } else {
-                    Path pomPath = new Path(absolute + "/pom.xml");
-                    logger.println("\nCopying from local path:" + pomPath
-                            + " to hadoop: /repository/" + artifact + "-" + version + "." + packaging);
-                    String name = "/repository/" + artifact + "-" + version + "." + packaging;
+                if (upStreamDeps.size() > 0) {
+                    String destName;// = "/repository/" + artifact + "-" + version + "/" + artifact + "-" + version + "." + packaging;
+
+                    File target = new File(absolute + File.separator + "target");
+                    logger.println("Produced artifacts found:");
+                    File[] files = target.listFiles();
                     
-                    Path nameP = new Path(name);
-                    FileStatus[] status2 = fs.listStatus(nameP);
-                    if (status2 == null) 
-                        try{
-                        fs.copyFromLocalFile(pomPath, new Path(name));
-                        }catch (Exception e){
-                            logger.println("Exception");
+                    
+                    for (File file : files) {
+                        if (file.isFile()) {
+                            logger.println(file.getPath());
+                            artPath = file.getAbsolutePath();
+                            if (artPath.contains("pom") || artPath.contains("jar") || artPath.contains("war") || artPath.contains("ear")) {
+                                String suffix = artPath.substring(artPath.lastIndexOf('.')+1, artPath.length());
+                                Path absArtifactPath = new Path(artPath);
+//                                if (!suffix.equals(packaging)){
+                                destName = "/repository/" + artifact + "-" + version + "/" + artifact + "-" + version + "." + suffix;
+//                                }
+                                
+                                Path nameP = new Path(artPath);
+                                FileStatus[] status3 = fs.listStatus(nameP);
+                                if (status3 == null) {
+                                    
+                                    logger.println("\nCopying from local path:" + absArtifactPath + " to hadoop:" + destName);
+                                    fs.copyFromLocalFile(absArtifactPath, new Path(destName));
+                                }
+                            }
                         }
+                    }
                 }
+                // Copy only parent pom or archive at least main pom
+                //if (upStreamDeps.size() <= 0 || !somethingFound){
+                Path pomPath = new Path(absolute + "/pom.xml");
+                logger.println("\nCopying from local path:" + pomPath
+                        + " to hadoop: /repository/" + artifact + "-" + version + ".pom");
+                String name = "/repository/" + artifact + "-" + version + "/" + artifact + "-" + version + ".pom";
+
+                Path nameP = new Path(name);
+                FileStatus[] status2 = fs.listStatus(nameP);
+                if (status2 == null) {
+                    try {
+                        fs.copyFromLocalFile(pomPath, new Path(name));
+                    } catch (Exception e) {
+                        logger.println("Exception");
+                    }
+                }
+                //}
             } catch (Exception e) {
                 logger.println("Failed to insert packaged artifact to hdfs repository! Maybe artifact only exists and this is not error.");
                 //e.printStackTrace();
                 //return Result.FAILURE;
             }
-            
-            logger.println("Inserting to hadoop finished"); 
+
+            logger.println("Inserting to hadoop finished");
             // ####### EOF Hadoop stuff, maven plugin continues      
 
-            if(r==0)    return Result.SUCCESS;
+            if (r == 0) {
+                return Result.SUCCESS;
+            }
 
-            if(markAsSuccess) {
+            if (markAsSuccess) {
                 logger.println(Messages.MavenBuilder_Failed());
                 return Result.SUCCESS;
             }
@@ -387,87 +419,74 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             throw new IOException2(e);
         } catch (NoSuchRealmException ex) {
             throw new IOException2(ex);
-        }
-        finally {
-            
+        } finally {
+
             //PluginManagerInterceptor.setListener(null);
             //LifecycleExecutorInterceptor.setListener(null);
-            callSetListenerWithReflectOnInterceptorsQuietly( null, mavenJailProcessClassLoader );
+            callSetListenerWithReflectOnInterceptorsQuietly(null, mavenJailProcessClassLoader);
         }
 
     }
 
-    private void callSetListenerWithReflectOnInterceptors( PluginManagerListener pluginManagerListener, ClassLoader cl )
-        throws ClassNotFoundException, SecurityException, NoSuchMethodException, IllegalArgumentException,
-        IllegalAccessException, InvocationTargetException
-    {
-        if (pluginManagerInterceptorClazz == null)
-            pluginManagerInterceptorClazz = cl.loadClass( "hudson.maven.agent.PluginManagerInterceptor" );
-        if (pluginManagerInterceptorListenerClazz == null)    
-            pluginManagerInterceptorListenerClazz = new Class[] { 
-                cl.loadClass( "hudson.maven.agent.PluginManagerListener" ) };
+    private void callSetListenerWithReflectOnInterceptors(PluginManagerListener pluginManagerListener, ClassLoader cl)
+            throws ClassNotFoundException, SecurityException, NoSuchMethodException, IllegalArgumentException,
+            IllegalAccessException, InvocationTargetException {
+        if (pluginManagerInterceptorClazz == null) {
+            pluginManagerInterceptorClazz = cl.loadClass("hudson.maven.agent.PluginManagerInterceptor");
+        }
+        if (pluginManagerInterceptorListenerClazz == null) {
+            pluginManagerInterceptorListenerClazz = new Class[]{
+                cl.loadClass("hudson.maven.agent.PluginManagerListener")};
+        }
 
         Method setListenerMethod =
-            pluginManagerInterceptorClazz.getMethod( "setListener", pluginManagerInterceptorListenerClazz);
-        setListenerMethod.invoke( null, new Object[] { pluginManagerListener } );
+                pluginManagerInterceptorClazz.getMethod("setListener", pluginManagerInterceptorListenerClazz);
+        setListenerMethod.invoke(null, new Object[]{pluginManagerListener});
 
-        if (lifecycleInterceptorClazz == null)
-            lifecycleInterceptorClazz = cl.loadClass( "org.apache.maven.lifecycle.LifecycleExecutorInterceptor" );
-        if (lifecycleInterceptorListenerClazz == null)   
-            lifecycleInterceptorListenerClazz = new Class[] { 
-                cl.loadClass( "org.apache.maven.lifecycle.LifecycleExecutorListener" ) };
+        if (lifecycleInterceptorClazz == null) {
+            lifecycleInterceptorClazz = cl.loadClass("org.apache.maven.lifecycle.LifecycleExecutorInterceptor");
+        }
+        if (lifecycleInterceptorListenerClazz == null) {
+            lifecycleInterceptorListenerClazz = new Class[]{
+                cl.loadClass("org.apache.maven.lifecycle.LifecycleExecutorListener")};
+        }
 
         setListenerMethod =
-            lifecycleInterceptorClazz.getMethod( "setListener", lifecycleInterceptorListenerClazz);
+                lifecycleInterceptorClazz.getMethod("setListener", lifecycleInterceptorListenerClazz);
 
-        setListenerMethod.invoke( null, new Object[] { pluginManagerListener } );
+        setListenerMethod.invoke(null, new Object[]{pluginManagerListener});
     }
-    
-    private void callSetListenerWithReflectOnInterceptorsQuietly( PluginManagerListener pluginManagerListener, ClassLoader cl )
-    {
-        try
-        {
-            callSetListenerWithReflectOnInterceptors(pluginManagerListener, cl);
-        }
-        catch ( SecurityException e )
-        {
-            throw new RuntimeException( e.getMessage(), e );
-        }
-        catch ( IllegalArgumentException e )
-        {
-            throw new RuntimeException( e.getMessage(), e );
-        }
-        catch ( ClassNotFoundException e )
-        {
-            throw new RuntimeException( e.getMessage(), e );
-        }
-        catch ( NoSuchMethodException e )
-        {
-            throw new RuntimeException( e.getMessage(), e );
-        }
-        catch ( IllegalAccessException e )
-        {
-            throw new RuntimeException( e.getMessage(), e );
-        }
-        catch ( InvocationTargetException e )
-        {
-            throw new RuntimeException( e.getMessage(), e );
-        }
-    }  
 
+    private void callSetListenerWithReflectOnInterceptorsQuietly(PluginManagerListener pluginManagerListener, ClassLoader cl) {
+        try {
+            callSetListenerWithReflectOnInterceptors(pluginManagerListener, cl);
+        } catch (SecurityException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        } catch (InvocationTargetException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        }
+    }
 
     /**
-     * Receives {@link PluginManagerListener} and {@link LifecycleExecutorListener} events
-     * and converts them to {@link MavenBuilder} events.
+     * Receives {@link PluginManagerListener} and
+     * {@link LifecycleExecutorListener} events and converts them to
+     * {@link MavenBuilder} events.
      */
     private static final class Adapter implements PluginManagerListener, LifecycleExecutorListener {
+
         /**
          * Used to detect when to fire {@link MavenReporter#enterModule}
          */
         private MavenProject lastModule;
-
         private final MavenBuilder listener;
-
         /**
          * Number of total nanoseconds {@link MavenBuilder} spent.
          */
@@ -480,44 +499,44 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
         public void preBuild(MavenSession session, ReactorManager rm, EventDispatcher dispatcher) throws BuildFailureException, LifecycleExecutionException, IOException, InterruptedException {
             long startTime = System.nanoTime();
             listener.preBuild(session, rm, dispatcher);
-            overheadTime += System.nanoTime()-startTime;
+            overheadTime += System.nanoTime() - startTime;
         }
 
         public void postBuild(MavenSession session, ReactorManager rm, EventDispatcher dispatcher) throws BuildFailureException, LifecycleExecutionException, IOException, InterruptedException {
             long startTime = System.nanoTime();
             fireLeaveModule();
             listener.postBuild(session, rm, dispatcher);
-            overheadTime += System.nanoTime()-startTime;
+            overheadTime += System.nanoTime() - startTime;
         }
 
         public void endModule() throws InterruptedException, IOException {
             long startTime = System.nanoTime();
             fireLeaveModule();
-            overheadTime += System.nanoTime()-startTime;
+            overheadTime += System.nanoTime() - startTime;
         }
 
         public void preExecute(MavenProject project, MojoExecution exec, Mojo mojo, PlexusConfiguration mergedConfig, ExpressionEvaluator eval) throws IOException, InterruptedException {
             long startTime = System.nanoTime();
-            if(lastModule!=project) {
+            if (lastModule != project) {
                 // module change
                 fireLeaveModule();
                 fireEnterModule(project);
             }
 
             listener.preExecute(project, new MojoInfo(exec, mojo, mergedConfig, eval));
-            overheadTime += System.nanoTime()-startTime;
+            overheadTime += System.nanoTime() - startTime;
         }
 
         public void postExecute(MavenProject project, MojoExecution exec, Mojo mojo, PlexusConfiguration mergedConfig, ExpressionEvaluator eval, Exception exception) throws IOException, InterruptedException {
             long startTime = System.nanoTime();
-            listener.postExecute(project, new MojoInfo(exec, mojo, mergedConfig, eval),exception);
-            overheadTime += System.nanoTime()-startTime;
+            listener.postExecute(project, new MojoInfo(exec, mojo, mergedConfig, eval), exception);
+            overheadTime += System.nanoTime() - startTime;
         }
 
         public void onReportGenerated(MavenReport report, MojoExecution mojoExecution, PlexusConfiguration mergedConfig, ExpressionEvaluator eval) throws IOException, InterruptedException {
             long startTime = System.nanoTime();
-            listener.onReportGenerated(lastModule,new MavenReportInfo(mojoExecution,report,mergedConfig,eval));
-            overheadTime += System.nanoTime()-startTime;
+            listener.onReportGenerated(lastModule, new MavenReportInfo(mojoExecution, report, mergedConfig, eval));
+            overheadTime += System.nanoTime() - startTime;
         }
 
         private void fireEnterModule(MavenProject project) throws InterruptedException, IOException {
@@ -526,13 +545,13 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
         }
 
         private void fireLeaveModule() throws InterruptedException, IOException {
-            if(lastModule!=null) {
+            if (lastModule != null) {
                 listener.postModule(lastModule);
                 lastModule = null;
             }
         }
     }
-    
+
     public void getAndUntar(FileSystem fs, String src, String targetPath) throws FileNotFoundException, IOException {
         BufferedOutputStream dest = null;
         InputStream tarArchiveStream = new FSDataInputStream(fs.open(new Path(src)));
@@ -558,7 +577,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                     dest.close();
                 }
             }
-        } catch(Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         } finally {
             if (dest != null) {
@@ -569,8 +588,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
         }
     }
     public static final int BUFFER_MAX = 2048;
-    
-    
+
     // Methods from Shell.class, used for script that installs and packages artifacts
     public boolean performWrapper(String command) throws InterruptedException {
         FilePath ws = new FilePath(new File(buildPath));
@@ -587,13 +605,13 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
         int r;
         try {
             EnvVars envVars = new EnvVars();
-            
+
             Iterator<Map.Entry<String, String>> entries = info.entrySet.entrySet().iterator();
             while (entries.hasNext()) {
                 Map.Entry<String, String> entry = entries.next();
                 envVars.put(entry.getKey(), entry.getValue());
             }
-            
+
             Launcher launcher = ws.createLauncher(listener);
             //r = launcher.launch().cmds("echo").envs(envVars).stdout(logger).pwd(ws).join();
             r = launcher.launch().cmds(buildCommandLine(script, command)).envs(envVars).stdout(listener).pwd(ws).join();
@@ -604,23 +622,24 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
         }
         return r == 0;
     }
-    
+
     private static String addCrForNonASCII(String s) {
-        if(!s.startsWith("#!")) {
-            if (s.indexOf('\n')!=0) {
+        if (!s.startsWith("#!")) {
+            if (s.indexOf('\n') != 0) {
                 return "\n" + s;
             }
         }
         return s;
-    }        
+    }
 
     private static String fixCrLf(String s) {
         // eliminate CR
         int idx;
-        while((idx=s.indexOf("\r\n"))!=-1)
-            s = s.substring(0,idx)+s.substring(idx+1);
+        while ((idx = s.indexOf("\r\n")) != -1) {
+            s = s.substring(0, idx) + s.substring(idx + 1);
+        }
         return s;
-    }    
+    }
 
     public String[] buildCommandLine(FilePath script, String command) {
         return new String[]{getShellOrDefault(script.getChannel()), "-xe", script.getRemote()};
@@ -646,12 +665,13 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
     }
 
     private static final class Shellinterpreter implements Callable<String, IOException> {
+
         private static final long serialVersionUID = 1L;
+
         public String call() throws IOException {
             return Functions.isWindows() ? "sh" : "/bin/sh";
         }
     }
-
     /**
      * Used by selected {@link MavenReporter}s to notify the maven build agent
      * that even though Maven is going to fail, we should report the build as
@@ -659,18 +679,18 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
      *
      * <p>
      * This rather ugly hook is necessary to mark builds as unstable, since
-     * maven considers a test failure to be a build failure, which will otherwise
-     * mark the build as FAILED.
+     * maven considers a test failure to be a build failure, which will
+     * otherwise mark the build as FAILED.
      *
      * <p>
-     * It's OK for this field to be static, because the JVM where this is actually
-     * used is in the Maven JVM, so only one build is going on for the whole JVM.
+     * It's OK for this field to be static, because the JVM where this is
+     * actually used is in the Maven JVM, so only one build is going on for the
+     * whole JVM.
      *
      * <p>
-     * Even though this field is public, please consider this field reserved
-     * for {@link SurefireArchiver}. Subject to change without notice.
+     * Even though this field is public, please consider this field reserved for
+     * {@link SurefireArchiver}. Subject to change without notice.
      */
     public static boolean markAsSuccess;
-
     private static final long serialVersionUID = 1L;
 }

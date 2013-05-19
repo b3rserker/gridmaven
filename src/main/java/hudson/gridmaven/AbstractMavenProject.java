@@ -67,7 +67,7 @@ public abstract class AbstractMavenProject<P extends AbstractProject<P,R>,R exte
     		 * @param listener
     		 *      Where the progress reports go.
     		 */
-    		if (build.getResult().isWorseThan(Result.SUCCESS)) return false;
+    		if (build.getResult().isWorseThan(Result.UNSTABLE)) return false;
     		// trigger dependency builds
     		AbstractProject<?,?> downstreamProject = getDownstreamProject();
     		if(AbstractMavenBuild.debug)

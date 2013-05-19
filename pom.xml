@@ -490,7 +490,7 @@ THE SOFTWARE.
         </executions>
       </plugin>
 
-<!-- Jrebel devel framework
+<!-- Jrebel devel framework -->
 	<plugin>
                 <groupId>org.zeroturnaround</groupId>
                 <artifactId>jrebel-maven-plugin</artifactId>
@@ -508,7 +508,6 @@ THE SOFTWARE.
                     </execution>
                 </executions>
             </plugin>
--->
 
       <plugin>
         <!-- put hadoop distribution in as a resource -->
@@ -526,14 +525,36 @@ THE SOFTWARE.
               <tasks>
                 <property name="dest" value="${project.basedir}/target/classes/hudson/gridmaven/gridlayer/" />
                 <mkdir dir="${dest}" />
-
-<delete>
-   <fileset dir="./work/hadoop"/>
-</delete>
                 <resolveArtifact groupId="org.jvnet.hudson.hadoop" artifactId="hadoop-core" version="${hadoop.version}" classifier="mini-bin" type="tar.gz" tofile="${dest}/hadoop.tar.gz" />
                 <!-- checksum used for up-to-date check -->
                 <checksum file="${dest}/hadoop.tar.gz" />
               </tasks>
+            </configuration>
+          </execution>
+	</executions>
+      </plugin>
+      <plugin>
+        <!-- put hadoop distribution in as a resource -->
+        <groupId>org.jvnet.maven-antrun-extended-plugin</groupId>
+        <artifactId>maven-antrun-extended-plugin</artifactId>
+        <version>1.38</version>
+	  <executions>
+	  <execution>
+            <goals>
+              <goal>run</goal>
+            </goals>
+	    <phase>compile</phase>
+	    <configuration>
+              <verifyArtifact>false</verifyArtifact>
+              <tasks>
+		<delete dir="./work/hadoop"/>
+ 
+<!--		<delete>
+                    <fileset dir="./work/hadoop">
+                    </fileset>
+                </delete>
+-->
+	      </tasks>
             </configuration>
           </execution>
         </executions>
