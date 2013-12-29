@@ -48,8 +48,6 @@ import org.codehaus.classworlds.*;
 
 /**
  * After all the projects have loaded, start Hadoop name node.
- *
- * @author Kohsuke Kawaguchi
  */
 @Extension
 public class StartupLoader extends ItemListener {
@@ -64,7 +62,7 @@ public class StartupLoader extends ItemListener {
             p.postInit();
             String hdfsUrl = p.getHdfsUrl();
             if(hdfsUrl!=null) {
-                // start Hadoop namenode and tracker node
+                // start Hadoop namenode and data node
                 StreamTaskListener listener = new StreamTaskListener(System.out);
                 File root = Hudson.getInstance().getRootDir();
                 p.channel = PluginImpl.createHadoopVM(root, listener);

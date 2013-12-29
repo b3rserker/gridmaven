@@ -57,7 +57,7 @@ import org.apache.hadoop.hdfs.DFSClient;
 import org.apache.hadoop.hdfs.server.namenode.NameNode;
 
 /**
- * @author huybrechts
+ * Entry point for Jenkins plugin module
  */
 public class PluginImpl extends Plugin {
     
@@ -70,11 +70,13 @@ public class PluginImpl extends Plugin {
     private boolean format = Boolean.getBoolean("hadoop.format");
     private HadoopInstance hadoop;
     private boolean hadoopInstantiated = false;
-    
+
+    /**
+    * Start plugin module
+    */ 
     @Override
     public void start() throws Exception {
         super.start();
-
         Items.XSTREAM.alias("grid-maven2", MavenModule.class);
         Items.XSTREAM.alias("grid-dependency", ModuleDependency.class);
         Items.XSTREAM.alias("grid-maven2-module-set", MavenModule.class);  // this was a bug, but now we need to keep it for compatibility
@@ -137,7 +139,10 @@ public class PluginImpl extends Plugin {
                 new ClasspathBuilder().addAll(distDir,"hadoop-*-core.jar").addAll(distDir,"lib/**/*.jar").add(distDir.child("conf")),
                 Collections.singletonMap("hadoop.log.dir",logDir.getAbsolutePath()));
     }
-
+    
+    /**
+     * Provide some namenode configuration.
+     */
     public Configuration getNameNodeConfiguration() {
         return nameConf;
     }    
@@ -202,6 +207,9 @@ public class PluginImpl extends Plugin {
         }
     }
 
+    /**
+     * Namenode initialization.
+     */
     public void postInit() throws IOException, InterruptedException {
         masterHostName = getMasterHostName();
         
@@ -235,7 +243,6 @@ public class PluginImpl extends Plugin {
             NameNode.format(nameConf);
         }
         // Hadoop adds all project files recursively to storage when job starts
-
         //String projectRoot = getWorkspace().getRemote() + File.separator + root.getRelativePath();
         //hadoop.quickAdd(projectRoot);
         //hadoop.listFiles("/");
@@ -259,9 +266,11 @@ public class PluginImpl extends Plugin {
     public static final int HTTP_PORT = 50070;
 
     private static final Logger LOGGER = Logger.getLogger(PluginImpl.class.getName());    
-
-    // Workaround hdfs bug, there must be passed class with hdfs libs classloaded
-    // otherwise hdfs internal classloader cannot find sources!
+    /**
+    * Connects to this HDFS.
+    * Workaround hdfs bug, there must be passed class with hdfs libs classloaded
+    * otherwise hdfs internal classloader cannot find sources!
+    */
     public HadoopInstance initHdfs(Class c) {
         hadoop = new HadoopInstance(c);
         hadoopInstantiated = true;

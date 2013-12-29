@@ -35,9 +35,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 
-/**
- * @author Kohsuke Kawaguchi
-*/
 class SlaveStartTask implements Callable<Void,IOException> {
     private final FilePath rootPath;
     private final TaskListener listener;
@@ -53,11 +50,11 @@ class SlaveStartTask implements Callable<Void,IOException> {
         this.address = address;
     }
 
+    // Start data node at destination
     public Void call() throws IOException {
         try {
             Channel channel = PluginImpl.createHadoopVM(new File(rootPath.getRemote()), listener);
             channel.call(new DataNodeStartTask(hdfsUrl, rootPath.getRemote(), address));
-            //channel.call(new TaskTrackerStartTask(hdfsUrl, rootPath.getRemote(), address, jobTrackerAddress));
             return null;
         } catch (InterruptedException e) {
             throw new IOException2(e);

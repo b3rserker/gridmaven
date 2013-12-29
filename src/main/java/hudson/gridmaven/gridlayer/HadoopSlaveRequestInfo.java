@@ -31,9 +31,9 @@ import java.util.Set;
 
 /**
  *
- * @author berserker
+ * @author Filip Hubik
  * This class delivers information about module
- * and hadoop prefs to slave as one entity.
+ * and HDFS preferences to slave as one entity.
  */
 public class HadoopSlaveRequestInfo implements Serializable{
 

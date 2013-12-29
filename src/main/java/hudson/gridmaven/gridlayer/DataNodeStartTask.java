@@ -59,11 +59,10 @@ class DataNodeStartTask implements Callable<Void,IOException> {
         conf.set("slave.host.name", slaveHostName);
         conf.set("dfs.safemode.extension", "1");
         conf.set("dfs.namenode.logging.level","ALL");
+        conf.set("dfs.block.size","1048576");
         // TODO: make this configurable
         // make room for builds
         conf.setLong("dfs.datanode.du.reserved",1L*1024*1024*1024);
-        //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-default.xml"));
-        //conf.addResource(new Path("/opt/hadoop-0.19.2/conf/hadoop-site.xml"));
 
         DataNode dn = DataNode.instantiateDataNode(new String[0],conf);
         DataNode.runDatanodeDaemon(dn);

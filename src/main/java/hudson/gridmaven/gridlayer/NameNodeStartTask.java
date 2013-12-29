@@ -73,6 +73,7 @@ class NameNodeStartTask implements Callable<Void,IOException> {
         conf.set("dfs.safemode.extension", "1");
         conf.set("dfs.block.size","1048576");
         //if(format) {
+            // This will provide format HDFS with every start
             System.out.println("Formatting HDFS");
             NameNode.format(conf);
         //}

@@ -674,16 +674,18 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
             //return wsl.allocate(getModuleSetBuild().getModuleRoot().child(getProject().getRelativePath()));
             //String workspace = lease.path.getRemote();
             //FilePath fnl = node.createPath(workspace);
-
-            Node node = getCurrentNode();
-            //String workspace = getRemote()
             
+            // We need to know, where is the workspace
+            Node node = getCurrentNode();
             FilePath nPath = node.getWorkspaceFor(project.getParent());
             FilePath f = nPath.child(getProject().getRelativePath());
             node.createPath(f.getRemote());
             return wsl.allocate(f); 
         }
-
+        
+        /**
+         * This method represents initialization of module build on master
+         */
         protected Result doRun(BuildListener listener) throws Exception {
             // pick up a list of reporters to run
             reporters = getProject().createReporters();
@@ -758,12 +760,12 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
             margs.add("-f", getModuleRoot().child("pom.xml").getRemote());
             margs.addTokenized(getProject().getGoals());
 
-
             //margs.add("package");
             //mvn package
             //mvn install:install-file -Dfile=<path-to-file> -DgroupId=<group-id> -DartifactId=<artifact-id> -Dversion=<version> -Dpackaging=<packaging>
 
             Map<String, String> systemProps = new HashMap<String, String>(envVars);
+            
             // backward compatibility
             systemProps.put("hudson.build.number", String.valueOf(getNumber()));
             String rel = project.getRelativePath();
@@ -773,6 +775,7 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
             // Fill object for serialization with necessarry info
             HadoopSlaveRequestInfo serialInfo = new HadoopSlaveRequestInfo();
             
+            // Prepare information for serialization
             MavenModule root = project.getParent().getRootModule();
             serialInfo.mArtifact = project.getModuleName().artifactId;
             serialInfo.mVersion = project.getVersion();
@@ -788,11 +791,14 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
                 serialInfo.addUpStreamDep(a.getModuleName().artifactId,
                         a.getModuleName().groupId,a.getVersion(),a.getPackaging());
             }
+            
             serialInfo.mavenExePath = mvn.getExecutable(launcher);
             Node node = getCurrentNode();
             FilePath rootPath = node.getWorkspaceFor(project.getParent());
             String workspace = rootPath.child(getProject().getRelativePath()).getRemote();
             serialInfo.entrySet = new HashMap<String, String>();
+            
+            // Prepare environment info
             for (Map.Entry<String, String> e : getBuildVariables().entrySet()) {
                 if ("".equals(e.getKey())) {
                     continue;
@@ -803,7 +809,7 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
                 System.getProperties().put(e.getKey(), e.getValue());
                 serialInfo.entrySet.put(e.getKey(), e.getValue());
             }
-            
+//            This is still here for possible future reimplelemtation            
 //            getCauses();
 //            String artifact = project.getModuleName().artifactId;
 //            String version = project.getVersion();
@@ -866,6 +872,7 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
 //            c.perform(MavenBuild.this, launcher, listener);
 //            listener.getLogger().println("\nBuilding standalone module " + projectName + "\n");
 
+            // Create process on remote machine, serialize and send info
             boolean normalExit = false;
             try {
                 Result r = process.call(new Builder(
@@ -889,6 +896,7 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
                         failed = true;
                     }
                 }
+//                Again for future compatibility                
 //                listener.getLogger().println("Packaging...");
 //                Shell b = new Shell(mvn.getExecutable(launcher)
 //                        + " -N -B package -Dmaven.test.skip=true -Dmaven.test.failure.ignore=true");
@@ -943,20 +951,19 @@ public class MavenBuild extends AbstractMavenBuild<MavenModule,MavenBuild> {
         public void cleanUp(BuildListener listener) throws Exception {
             boolean isUserBuild = false;
             
+            // Search for triggering user cause
             for (Cause c : getCauses()) {
                 if (c.getClass() == hudson.model.Cause.UserIdCause.class)
                     isUserBuild = true;
             }
             
-            // Trigger downstream builds
+            // Trigger downstream builds, only if this is casual downstream builder
             if (!isUserBuild){
                 super.cleanUp(listener);
             }
             
             buildEnvironments = null;
         }
-
-        
         
         public void post2(BuildListener listener) throws Exception {
             if (reporters != null) {

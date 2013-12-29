@@ -48,8 +48,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 /**
- *
- * @author berserker
+ * This class is wrapper for working with HDFS.
+ * @author Filip Hubik
  */
 public class HadoopInstance {
 
@@ -119,6 +119,9 @@ public class HadoopInstance {
         }
     }
 
+    /**
+     * List files stored in HDFS for debugging purposes.
+     */
     public void listFiles(String path, PrintStream print) {
         Path p = new Path(path);
         try {
@@ -150,7 +153,11 @@ public class HadoopInstance {
         }
         return true;
     }
-    
+
+    /**
+     * This method opens a path and recursively adds all files into tar, then
+     * inserts it to HDFS.
+     */
     public void tarAndInsert(String directoryPath, String tarGzPath) throws IOException {
         OutputStream fOut = null;
         //FileOutputStream fOut = null;
@@ -222,7 +229,10 @@ public class HadoopInstance {
     public FileSystem getFs() {
         return fs;
     }
-
+    
+    /**
+     * This method decompress filesystem structure from HDFS archive
+     */
     public void getAndUntar(String src, String targetPath) throws FileNotFoundException, IOException {
         BufferedOutputStream dest = null;
         InputStream tarArchiveStream = new FSDataInputStream(fs.open(new Path(src)));

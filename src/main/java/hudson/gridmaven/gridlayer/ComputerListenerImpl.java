@@ -42,7 +42,7 @@ import java.util.logging.Logger;
  * @author Kohsuke Kawaguchi
  */
 
-//TODO label musi patrit pluginu
+// Install hadoop files to destination nodes
 @Extension
 public class ComputerListenerImpl extends ComputerListener {
     @Override

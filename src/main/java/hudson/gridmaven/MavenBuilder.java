@@ -89,7 +89,8 @@ import org.codehaus.plexus.configuration.PlexusConfiguration;
  *
  * <p>
  * This class defines a series of event callbacks, which are invoked during the
- * build. This allows subclass to monitor the progress of a build.
+ * build. This allows subclass to monitor the progress of a build. This class
+ * represents build on destination node.
  *
  * @author Kohsuke Kawaguchi
  * @since 1.133
@@ -154,7 +155,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
     private Class[] lifecycleInterceptorListenerClazz;
 
     /**
-     * This code is executed inside the maven jail process.
+     * This code is executed inside the maven jail process on destination node.
      */
     public Result call() throws IOException {
 
@@ -177,7 +178,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
 
             registerSystemProperties();
 
-            // ####### Hadoop stuff start
+            // Hadoop configuration
             Configuration conf = new Configuration();
             conf.set("fs.default.name", info.hdfsUrl);
             conf.set("fs.hdfs.impl", "org.apache.hadoop.hdfs.DistributedFileSystem");
@@ -188,7 +189,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
 
             String installCommand = "";
 
-            // Untar
+            // Untar sources from hadoop directly
             logger.println("Untaring sources for artifact: " + info.mArtifact
                     + "-" + info.mVersion + "." + info.mPackaging);
             try {
@@ -200,7 +201,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             }
             logger.println("Untared file: " + hdfsSource + " to " + buildPath + "\n");
 
-            // Check if repository exists + HDFS working?
+            // Check if repository exists + is HDFS working
             Path repo = new Path("/repository");
             FileStatus[] status = fs.listStatus(repo);
             if (status != null) {
@@ -219,7 +220,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                 }
             }
 
-            // Install artifacts
+            // Install prerequisite artifacts
             if (info.upStreamDeps.size() > 0) {
                 logger.println("Preinstalling artifacts:");
             }
@@ -236,8 +237,8 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                     //IOException e = new IOException();
                     //e.printStackTrace();
                 }
-
                 logger.println("Copying from hadoop path: " + hdfsPath + " to local path:" + absPath);
+                // Copy selected artifact from HDFS
                 try {
                     FileStatus[] statusP = fs.listStatus(hdfsPath);
                     if (statusP == null)
@@ -250,7 +251,6 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                     logger.println("Prerequisite artifact needed for module build missing: " + artifactName);
                     return Result.FAILURE;
                 }
-                //goals.add("package");
                 String s = "install:install-file -Dfile=deps"+File.separator
                         + dep.art + "-" + dep.ver + "." + dep.pkg
                         + " -DgroupId=" + dep.group
@@ -259,8 +259,6 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                         + " -Dpackaging=" + dep.pkg
                         + " -DpomFile=" + "deps" + File.separator + dep.art + "-" + dep.ver + ".pom";
                 logger.println("Preinstalling artifact: " + s + "\n");
-                //Shell b = new Shell(mvn.getExecutable(launcher) + s);
-                //b.perform(MavenBuild.this, launcher, listener);
                 installCommand += info.mavenExePath + " " + s + ";";
             }
 
@@ -271,15 +269,15 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                 }
             } catch (Exception e) {
                 logger.println("Execute process of installing artifacts to local repository failed: " + installCommand);
-                //logger.println("If you have shared NFS repository...TODO: "+installCommand);
                 e.printStackTrace();
                 return Result.FAILURE;
             }
             logger.println("Artifact installation finished\n");
 
-            // ####### EOF Hadoop stuff, maven plugin continues
+            // End of preinstalation phase
 
             logger.println("Executing main goal");
+            
             // Lauch MAIN maven process
             logger.println(formatArgs(goals));
             int r = Main.launch(goals.toArray(new String[goals.size()]));
@@ -307,10 +305,10 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                 return Result.FAILURE;
             }
 
-            // ####### Hadoop stuff
-            // Package artifact
+            // Install produced artifacts to HDFS repository
             logger.println("Packaging...");
             try {
+                // Package artifact
                 performWrapper(info.mavenExePath + " -N -B package -Dmaven.test.skip=true -Dmaven.test.failure.ignore=true");
             } catch (InterruptedException ex) {
                 logger.println("Artifact packaging failed!");
@@ -321,10 +319,10 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
 
             // Insert compiled artifact to hdfs repository
             String absolute = buildPath;
-//            String relative = absolute.substring(absolute.lastIndexOf('/'), absolute.length());
             String artPath = absolute + "/target/" + artifact + "-" + version + "." + packaging;
             File normalPom = new File(artPath);
-            // If its bundle!
+            
+            // If its bundle, e.g. OSGi bundle, treat that as jar
             if (!normalPom.exists()){
                 artPath = absolute + "/target/" + artifact + "." + "jar";
                 File specialJar = new File(artPath);
@@ -333,15 +331,9 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
                         packaging = "jar";
                 }
             }
-
-
+            
+            // Copy created artifact only
             try {
-                // Copy produced archives
-                //if (upStreamDeps.size() > 0 && !artPath.equals("")) {
-                // String artPath;
-                // If theres no file in target folder
-                //boolean somethingFound = false;
-                
                 if (upStreamDeps.size() > 0 && !artPath.equals("")) {
                     String destName;
                     File target = new File(absolute + File.separator + "target");
@@ -398,7 +390,7 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
             }
 
             logger.println("Inserting to hadoop finished");
-            // ####### EOF Hadoop stuff, maven plugin continues      
+            // EOF Hadoop stuff, maven plugin continues      
 
             if (r == 0) {
                 return Result.SUCCESS;
@@ -433,6 +425,8 @@ public abstract class MavenBuilder extends AbstractMavenBuilder implements Deleg
     private void callSetListenerWithReflectOnInterceptors(PluginManagerListener pluginManagerListener, ClassLoader cl)
             throws ClassNotFoundException, SecurityException, NoSuchMethodException, IllegalArgumentException,
             IllegalAccessException, InvocationTargetException {
+        
+        // This patched code is required to run more instances of Maven-type plugin
         if (pluginManagerInterceptorClazz == null) {
             pluginManagerInterceptorClazz = cl.loadClass("hudson.maven.agent.PluginManagerInterceptor");
         }

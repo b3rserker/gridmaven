@@ -422,8 +422,7 @@ public class MavenModuleSet extends AbstractMavenProject<MavenModuleSet,MavenMod
     }
 
     /**
-     * Possibly empty list of all disabled modules (if disabled==true)
-     * or all enabeld modules (if disabled==false)
+     * This function recomputes dependency level of each module
      */
     public List<MavenModule> getDisabledModules(boolean disabled) {
 

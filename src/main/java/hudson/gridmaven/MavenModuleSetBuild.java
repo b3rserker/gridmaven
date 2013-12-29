@@ -616,7 +616,6 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
 
                 boolean nodeFound = false;
                 for (Node n : Jenkins.getInstance().getNodes()) {
-                    //nodeFound = (n.getLabelString().equals(gridLabel)) ? true : false;
                     if (n.getLabelString().equals(gridLabel))
                         nodeFound = true;
                 }
@@ -670,8 +669,6 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                     logger.println("Global found module: " + m.getName());
                 }
                 
-                
-                
                 for (MavenModule m : project.getModules()) {
                     String modulePath = getWorkspace() + File.separator + m.getRelativePath();
                     String artifact = m.getModuleName().artifactId;
@@ -717,6 +714,8 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                             adNames.add(a.getName());
                         }
                         String aProjectName = p.getName();
+                        
+                        // We want passthru the dependency tree in downstream direction
                         p.setBlockBuildWhenUpstreamBuilding(true);
 //                        if(p.scheduleBuild(p.getQuietPeriod(), new UpstreamCause((Run)this.getBuild()),
 //                                           buildActions.toArray(new Action[buildActions.size()]))) {
@@ -1166,9 +1165,8 @@ public class MavenModuleSetBuild extends AbstractMavenBuild<MavenModuleSet,Maven
                     // Projects are indexed by POM path and not module path because
                     // Maven allows to have several POMs with different names in the same directory
                     canonicalPaths.put( mp.getFile().getCanonicalPath(), mp );
-                }                
-                //MavenUtil.resolveModules(embedder,mp,getRootPath(rootPOMRelPrefix),relPath,listener,nonRecursive);
-
+                }
+                
                 if(verbose) {
                     for (Entry<String,MavenProject> e : canonicalPaths.entrySet())
                         logger.printf("Discovered %s at %s\n",e.getValue().getId(),e.getKey());
